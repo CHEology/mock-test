@@ -14,6 +14,7 @@ let db = { version: 1, attempts: [], deleted: {} },
   active = null,
   screen = "home",
   reviewing = false,
+  testHelpOpen = false,
   zoom = 100,
   hideTime = false,
   diskReady = false,
@@ -186,6 +187,7 @@ function attemptStatus(a) {
     : `${s.label} · ${a.question + 1}/${s.questions.length}`;
 }
 function renderHome() {
+  testHelpOpen = false;
   leaveFocusMode();
   screen = "home";
   active = null;
@@ -231,6 +233,7 @@ function groupHistory(group) {
   renderHistory();
 }
 function renderHistory() {
+  testHelpOpen = false;
   leaveFocusMode();
   closeModal();
   closeTools();
@@ -300,6 +303,7 @@ function startDialog(id) {
   );
 }
 function begin(id) {
+  testHelpOpen = false;
   historyGroup =
     db.library.find((r) => r.kind === "test" && r.testId === id)?.parent ||
     "all";
@@ -340,6 +344,7 @@ function startClock() {
       : null;
 }
 function resume(id) {
+  testHelpOpen = false;
   active = db.attempts.find((a) => a.id === id);
   reviewing = false;
   if (!active) return;
@@ -425,14 +430,23 @@ function feedback(q) {
 function textQuestion(q) {
   return `<div class="text-question"><p>${esc(q.text).replace(/\n/g, "<br>")}</p>${q.options ? `<div class="demo-options">${q.options.map((column, i) => `<div><strong>Blank (${["i", "ii", "iii"][i]})</strong>${column.map((v, j) => `<p>${letters(3)[j]}. ${esc(v)}</p>`).join("")}</div>`).join("")}</div>` : ""}</div>`;
 }
+function testHeader() {
+  const s = section();
+  return `<header class="test-top"><div class="brand"><b>M</b>Mock Test <span class="sub">${esc(testName(test()))} · ${esc(s?.title || s?.label || "Writing")}</span></div><div class="row">${reviewing ? "<strong>Answer review</strong>" : `<span id="timer" class="timer"></span><button data-action="time">${hideTime ? "Show" : "Hide"} time</button>`}${focusButton()}</div></header>`;
+}
 function renderTest() {
   screen = "test";
   closeTools();
+  if (testHelpOpen) {
+    app.innerHTML = `<div class="test-shell">${testHeader()}<main class="test-help"><div class="content-page"><div class="library-heading row spread"><h1>Help</h1><button data-action="back-to-test">Back to test</button></div>${helpContent(true)}</div></main></div>`;
+    updateTimer();
+    return;
+  }
   const s = section(),
     q = question(),
     essay = !s;
   document.title = `${testName(test())} · ${s?.label || "Writing"} | Mock Test`;
-  app.innerHTML = `<div class="test-shell"><header class="test-top"><div class="brand"><b>M</b>Mock Test <span class="sub">${esc(testName(test()))} · ${esc(s?.title || s?.label || "Writing")}</span></div><div class="row">${reviewing ? "<strong>Answer review</strong>" : `<span id="timer" class="timer"></span><button data-action="time">${hideTime ? "Show" : "Hide"} time</button>`}${focusButton()}</div></header><div class="toolbar"><h2>${essay ? "Writing" : `${esc(s.label)} · Question ${q.number} of ${s.questions.length}`}</h2><div class="row">${s?.calculator ? '<button data-action="calculator">Calculator</button>' : ""}<button data-action="scratch">Scratchpad</button>${!essay ? `<button data-action="flag" class="${active.flags[q.id] ? "marked" : ""}" aria-pressed="${!!active.flags[q.id]}">${active.flags[q.id] ? "★ Marked" : "☆ Mark"}</button><button data-action="review">Review</button>` : ""}<button data-action="help">Help</button></div></div><div class="workspace"><main class="question-pane">${essay ? essayHTML() : q.type === "sentence" ? `<div class="sentence-layout"><div class="passage">${q.sentences.map((x, i) => `<button class="sentence ${answerValue() === letters(q.count)[i] ? "selected" : ""}" data-choice="${letters(q.count)[i]}" aria-pressed="${answerValue() === letters(q.count)[i]}" ${reviewing ? "disabled" : ""}>${esc(x)}</button> `).join("")}</div><div class="sentence-prompt">${esc(q.prompt)}</div></div>` : q.text ? textQuestion(q) : `<div class="image-frame" style="width:${zoom}%"><img class="question-image" style="max-width:${(1100 * zoom) / 100}px" src="${q.image}" alt="Test ${active.test}, ${esc(s.label)}, question ${q.number}" draggable="false"></div>`}</main>${essay ? "" : `<aside class="answer-panel">${controls(q)}</aside>`}</div><nav class="bottom-nav"><div class="row">${reviewing ? '<button data-action="results">← Results</button>' : '<button data-action="leave">Save & exit</button>'}${!essay ? `<div class="zoom-controls"><button data-zoom="-10" aria-label="Zoom out">−</button><span>${zoom}%</span><button data-zoom="10" aria-label="Zoom in">+</button></div>` : ""}</div><div class="row">${!essay ? `<button data-action="back" ${active.question === 0 ? "disabled" : ""}>← Back</button>` : ""}<button class="primary" data-action="next">${essay ? "Finish writing" : active.question === s.questions.length - 1 ? (reviewing ? "Results" : "Finish section") : "Next →"}</button></div></nav></div>`;
+  app.innerHTML = `<div class="test-shell">${testHeader()}<div class="toolbar"><h2>${essay ? "Writing" : `${esc(s.label)} · Question ${q.number} of ${s.questions.length}`}</h2><div class="row">${s?.calculator ? '<button data-action="calculator">Calculator</button>' : ""}<button data-action="scratch">Scratchpad</button>${!essay ? `<button data-action="flag" class="${active.flags[q.id] ? "marked" : ""}" aria-pressed="${!!active.flags[q.id]}">${active.flags[q.id] ? "★ Marked" : "☆ Mark"}</button><button data-action="review">Review</button>` : ""}<button data-action="help">Help</button></div></div><div class="workspace"><main class="question-pane">${essay ? essayHTML() : q.type === "sentence" ? `<div class="sentence-layout"><div class="passage">${q.sentences.map((x, i) => `<button class="sentence ${answerValue() === letters(q.count)[i] ? "selected" : ""}" data-choice="${letters(q.count)[i]}" aria-pressed="${answerValue() === letters(q.count)[i]}" ${reviewing ? "disabled" : ""}>${esc(x)}</button> `).join("")}</div><div class="sentence-prompt">${esc(q.prompt)}</div></div>` : q.text ? textQuestion(q) : `<div class="image-frame" style="width:${zoom}%"><img class="question-image" style="max-width:${(1100 * zoom) / 100}px" src="${q.image}" alt="Test ${active.test}, ${esc(s.label)}, question ${q.number}" draggable="false"></div>`}</main>${essay ? "" : `<aside class="answer-panel">${controls(q)}</aside>`}</div><nav class="bottom-nav"><div class="row">${reviewing ? '<button data-action="results">← Results</button>' : '<button data-action="leave">Save & exit</button>'}${!essay ? `<div class="zoom-controls"><button data-zoom="-10" aria-label="Zoom out">−</button><span>${zoom}%</span><button data-zoom="10" aria-label="Zoom in">+</button></div>` : ""}</div><div class="row">${!essay ? `<button data-action="back" ${active.question === 0 ? "disabled" : ""}>← Back</button>` : ""}<button class="primary" data-action="next">${essay ? "Finish writing" : active.question === s.questions.length - 1 ? (reviewing ? "Results" : "Finish section") : "Next →"}</button></div></nav></div>`;
   updateTimer();
   if (essay) {
     $("#essay").addEventListener("input", () => {
@@ -542,6 +556,7 @@ function finishSection(expired = false) {
   else renderBetween();
 }
 function renderBetween() {
+  testHelpOpen = false;
   screen = "between";
   const s = section();
   app.innerHTML = `<main class="center-screen"><div class="eyebrow">${esc(testName(test()))}</div><h1 style="margin-top:22px">${active.expired ? "Time is up." : "Section complete."}</h1><p>Your answers have been saved.</p><div class="card" style="margin:32px 0"><h2>Next: ${esc(s.title || s.label)}</h2><div class="section-track"><span>${s.questions.length} questions</span><span>${active.mode === "timed" ? s.minutes + " minutes" : "Untimed"}</span></div></div><div class="row spread">${homeButton()}<button class="primary" data-action="next-section">Start ${esc(s.label)}</button></div></main>`;
@@ -559,6 +574,7 @@ function updateTimer() {
   if (active.mode === "timed" && remaining <= 0) finishSection(true);
 }
 function renderResults() {
+  testHelpOpen = false;
   leaveFocusMode();
   closeModal();
   screen = "results";
@@ -764,12 +780,26 @@ document.addEventListener("fullscreenchange", () => {
   const button = $('[data-action="fullscreen"]');
   if (button) button.outerHTML = focusButton();
 });
-function settingsDialog() {
-  dialog(
-    `<form id="settings-form" class="settings-form"><h2>Settings</h2><label class="setting-row"><span>Full-screen focus mode</span><input id="setting-focus" type="checkbox" ${settings.focusMode ? "checked" : ""}></label><label class="setting-row"><span>Default test mode</span><select id="setting-mode"><option value="timed" ${settings.mode === "timed" ? "selected" : ""}>Timed</option><option value="practice" ${settings.mode === "practice" ? "selected" : ""}>Untimed</option></select></label><label class="setting-row"><span>Include writing by default</span><input id="setting-writing" type="checkbox" ${settings.includeWriting ? "checked" : ""}></label><label class="setting-row"><span>Show timer</span><input id="setting-timer" type="checkbox" ${settings.showTimer ? "checked" : ""}></label><label class="setting-row"><span>Show sidebar</span><input id="setting-sidebar" type="checkbox" ${!sidebarHidden ? "checked" : ""}></label><div class="dialog-actions"><button type="button" data-action="close">Cancel</button><button class="primary">Save</button></div></form>`,
+function renderInfoPage(name, content) {
+  leaveFocusMode();
+  closeModal();
+  closeTools();
+  active = null;
+  reviewing = false;
+  screen = name.toLowerCase();
+  document.title = `${name} | Mock Test`;
+  app.innerHTML = libraryShell(
+    `<div class="content-page"><div class="library-heading"><h1>${name}</h1></div>${content}</div>`,
+    screen,
   );
-  $("#settings-form").onsubmit = (e) => {
-    e.preventDefault();
+}
+function renderSettings() {
+  renderInfoPage(
+    "Settings",
+    `<form id="settings-form" class="settings-form"><section class="settings-section"><h2>Testing</h2><label class="setting-row"><span>Full-screen focus mode</span><input id="setting-focus" type="checkbox" ${settings.focusMode ? "checked" : ""}></label><label class="setting-row"><span>Default test mode</span><select id="setting-mode"><option value="timed" ${settings.mode === "timed" ? "selected" : ""}>Timed</option><option value="practice" ${settings.mode === "practice" ? "selected" : ""}>Untimed</option></select></label><label class="setting-row"><span>Include writing by default</span><input id="setting-writing" type="checkbox" ${settings.includeWriting ? "checked" : ""}></label></section><section class="settings-section"><h2>Display</h2><label class="setting-row"><span>Show timer</span><input id="setting-timer" type="checkbox" ${settings.showTimer ? "checked" : ""}></label><label class="setting-row"><span>Show sidebar</span><input id="setting-sidebar" type="checkbox" ${!sidebarHidden ? "checked" : ""}></label></section></form>`,
+  );
+  $("#settings-form").onsubmit = (e) => e.preventDefault();
+  $("#settings-form").onchange = () => {
     settings = C.preferences({
       focusMode: $("#setting-focus").checked,
       mode: $("#setting-mode").value,
@@ -783,19 +813,25 @@ function settingsDialog() {
       notify("Settings could not be saved in this browser.");
     }
     if (hideSidebar !== sidebarHidden) toggleLibrarySidebar();
-    closeModal();
   };
 }
-
+function helpContent(inTest = false) {
+  return `<div class="help-content">${inTest ? "" : "<section><h2>Your library</h2><p>Organize tests into categories and folders. Use the ··· menu to rename, move, or create a practice copy. Restore removed items from Trash.</p></section>"}<section><h2>Answering questions</h2><p>Select answers on the right. Unlabelled choices follow their order in the question; each blank starts at A. Numeric answers accept decimals or fractions. For sentence-selection questions, click the passage directly.</p><p>Use Mark and Review to revisit questions within the current section. Calculator and Scratchpad are available from the test toolbar.</p></section><section><h2>Timing and progress</h2><p>Progress saves automatically. Timed sections keep counting while you read Help or leave the test. Save &amp; exit lets you return later; finishing a section moves you forward.</p></section><section><h2>Attempts and results</h2><p>Each category and folder has its own Attempts tab. Resume, review, export, or delete attempts there. Results use the supplied answer key; writing is saved without automatic grading.</p></section><section><h2>Focus mode</h2><p>Tests open full screen by default. Press Esc or Exit focus to leave full screen. Change the default in Settings or turn it off before starting a test.</p></section></div>`;
+}
 function help() {
-  dialog(
-    '<h2>Using the test</h2><p>Select answers in the panel on the right. Unlabelled choices follow their order in the question: top to bottom, or left to right across each row. Multi-blank choices restart at A in each column.</p><p>Use Mark and Review to return to questions within the current section. Numeric entries accept equivalent decimals or fractions. Click directly on the passage for sentence-selection questions.</p><p>Timed sections keep counting if you leave or close the tab. Progress saves automatically. Results show accuracy against the supplied answer key.</p><div class="dialog-actions"><button class="primary" data-action="close">Got it</button></div>',
-  );
+  if (screen === "test") {
+    testHelpOpen = true;
+    renderTest();
+  } else renderInfoPage("Help", helpContent());
 }
 async function action(name) {
   switch (name) {
     case "close":
       closeModal();
+      break;
+    case "back-to-test":
+      testHelpOpen = false;
+      renderTest();
       break;
     case "help":
       help();
@@ -812,7 +848,7 @@ async function action(name) {
       renderTest();
       break;
     case "settings":
-      settingsDialog();
+      renderSettings();
       break;
     case "fullscreen":
       if (document.fullscreenElement) {

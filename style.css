@@ -1295,7 +1295,7 @@ dialog h2 {
 }
 
 .settings-form {
-  min-width: min(380px, 70vw);
+  width: 100%;
 }
 .setting-row {
   display: flex;
@@ -1352,4 +1352,31 @@ dialog h2 {
   .library-sidebar .sidebar-heading .brand {
     margin: 0;
   }
+}
+
+.content-page {
+  max-width: 720px;
+}
+.settings-section + .settings-section {
+  margin-top: 40px;
+}
+.settings-section h2,
+.help-content h2 {
+  font-size: 19px;
+  margin: 0 0 10px;
+}
+.help-content section + section {
+  margin-top: 30px;
+}
+.help-content p {
+  line-height: 1.7;
+  margin: 8px 0 0;
+}
+.test-help {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 32px 40px;
+}
+.test-help .content-page {
+  margin: 0 auto;
 }
