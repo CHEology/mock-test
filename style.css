@@ -1245,9 +1245,6 @@ dialog h2 {
 .library-shell.sidebar-hidden {
   grid-template-columns: minmax(0, 1fr);
 }
-.library-sidebar[hidden] {
-  display: none;
-}
 .library-topline {
   display: flex;
   align-items: center;
@@ -1339,12 +1336,6 @@ dialog h2 {
 .sidebar-heading .sidebar-toggle {
   padding: 3px;
 }
-.sidebar-reopen {
-  display: inline-flex;
-}
-.sidebar-reopen[hidden] {
-  display: none;
-}
 @media (max-width: 720px) {
   .sidebar-heading {
     margin-bottom: 18px;
@@ -1379,4 +1370,52 @@ dialog h2 {
 }
 .test-help .content-page {
   margin: 0 auto;
+}
+
+.sidebar-edge {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 12px;
+  z-index: 30;
+}
+.sidebar-edge[hidden] {
+  display: none;
+}
+.sidebar-hidden .library-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 31;
+  width: 232px;
+  padding: 32px 20px;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition:
+    transform 180ms ease,
+    visibility 180ms;
+  border-right: 1px solid var(--line);
+  border-bottom: 0;
+}
+.sidebar-hidden.sidebar-peeking .library-sidebar {
+  transform: translateX(0);
+  visibility: visible;
+  box-shadow: 10px 0 30px #17383d14;
+}
+.sidebar-hidden .library-sidebar nav {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+.sidebar-hidden .side-link {
+  width: 100%;
+}
+.sidebar-hidden .side-section > span {
+  display: inline;
+}
+.sidebar-hidden .side-bottom {
+  display: block;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-hidden .library-sidebar {
+    transition: none;
+  }
 }

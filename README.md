@@ -21,7 +21,7 @@ python3 launch.py
 
 This starts the local server and opens **http://127.0.0.1:17654** in Chrome on macOS when installed, or your default browser otherwise. Use `MOCK_TEST_PORT=17655 python3 launch.py` to choose another port. To run in the foreground instead, use `python3 server.py`.
 
-Help and Settings open in the main content area. Settings changes save immediately. Settings controls default focus mode, timed/untimed mode, writing, timer visibility, and the sidebar. Focus mode uses the browser’s Fullscreen API: Esc or **Exit focus** returns to the normal window, and finishing or leaving a test exits automatically. Browser permission restrictions may prevent automatic full screen; the test still starts. Preferences are saved in this browser.
+The sidebar can stay pinned or auto-hide: move to the left edge to reveal it, move away to hide it, and use its corner button to pin it again. Help and Settings open in the main content area. Settings changes save immediately. Settings controls default focus mode, timed/untimed mode, writing, timer visibility, and the sidebar. Focus mode uses the browser’s Fullscreen API: Esc or **Exit focus** returns to the normal window, and finishing or leaving a test exits automatically. Browser permission restrictions may prevent automatic full screen; the test still starts. Preferences are saved in this browser.
 
 ## Add your questions
 
