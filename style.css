@@ -1519,3 +1519,10 @@ dialog h2 {
 .library-dragging .sidebar-hidden .library-sidebar {
   transition: none;
 }
+
+/* Keep blank row space available for marquee selection in any direction. */
+.library-item .item-title h2,
+.library-item .folder-open {
+  width: fit-content;
+  max-width: 100%;
+}

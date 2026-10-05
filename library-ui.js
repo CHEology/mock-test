@@ -758,13 +758,20 @@ document.addEventListener("pointerdown", (e) => {
     e.target.closest("#library-context-menu")
   )
     return;
-  const item = e.target.closest("[data-lib-item]");
+  const row = e.target.closest("[data-lib-item]");
+  const item =
+    row &&
+    (librarySelection.has(row.dataset.libItem) ||
+      e.target.closest(".item-icon, .item-title h2, .folder-open"))
+      ? row
+      : null;
   if (
     e.target.closest("button,input,select,textarea,a") &&
     !e.target.closest(".folder-open")
   )
     return;
-  if (!item && !e.target.closest(".library-items, .library-main")) return;
+  if (e.target.closest("#library-sidebar, .sidebar-edge")) return;
+  if (!e.target.closest(".library-shell")) return;
   closeLibraryMenu();
   const before = new Set(librarySelection);
   const additive = e.metaKey || e.ctrlKey || e.shiftKey;
