@@ -5,7 +5,7 @@ A general-purpose mock-test interface that runs locally in your browser. Plain J
 - Configurable sections, timing, and optional writing tasks
 - Single/multiple choice, multi-blank, numeric, fraction, and sentence-selection answers
 - Mark and review, calculator, and typed/drawn scratchpad
-- Local autosave, attempt history, export, and answer-key scoring
+- Local autosave, filtered attempt history, bulk deletion, export, and answer-key scoring
 
 ## Run
 

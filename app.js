@@ -4,7 +4,11 @@ const DATA = window.MOCK_TEST_DATA,
   $ = (s) => document.querySelector(s),
   app = $("#app"),
   modal = $("#modal");
-let db = { version: 1, attempts: [] },
+let db = { version: 1, attempts: [], deleted: {} },
+  historyTest = "all",
+  historyStatus = "all",
+  selectedAttempts = new Set(),
+  pendingDelete = null,
   active = null,
   screen = "home",
   reviewing = false,
@@ -41,10 +45,10 @@ function notify(t) {
   clearTimeout(notify.timer);
   notify.timer = setTimeout(() => $("#toast").classList.remove("show"), 2700);
 }
-function save() {
+function save(touchActive = true) {
   dirty = true;
   db.updated = Date.now();
-  if (active) active.updated = db.updated;
+  if (active && touchActive) active.updated = db.updated;
   try {
     localStorage.setItem("mock-test-v1", JSON.stringify(db));
   } catch (e) {
@@ -68,10 +72,14 @@ function flushDisk() {
         body: snapshot,
       });
       if (!r.ok) throw Error("Save failed");
+      const response = await r.json();
+      if (response.state) acceptState(response.state);
+      return true;
     })
-    .catch(() =>
-      notify("Disk save failed. Keep this tab open and export your progress."),
-    );
+    .catch(() => {
+      notify("Disk save failed. Keep this tab open and export your progress.");
+      return false;
+    });
   return saveChain;
 }
 async function init() {
@@ -90,9 +98,37 @@ async function init() {
   const candidates = [local, disk].filter(
     (x) => x?.version === 1 && Array.isArray(x.attempts),
   );
-  if (candidates.length)
-    db = candidates.sort((a, b) => (b.updated || 0) - (a.updated || 0))[0];
+  db = C.mergeState(...candidates);
   renderHome();
+}
+function acceptState(state, persist = true) {
+  const previous = active;
+  db = C.mergeState(db, state);
+  if (previous) active = db.attempts.find((a) => a.id === previous.id) || null;
+  if (persist) {
+    try {
+      localStorage.setItem("mock-test-v1", JSON.stringify(db));
+    } catch (_) {}
+  }
+  if (previous && !active) {
+    closeModal();
+    renderHome();
+    notify("This attempt was cleared.");
+  } else if (screen === "home") renderHome();
+  else if (screen === "history" && !modal.open) renderHistory();
+  else if (active && active.updated > (previous?.updated || 0)) {
+    closeModal();
+    if (active.status === "done") renderResults();
+    else if (active.status === "between") renderBetween();
+    else renderTest();
+  }
+}
+async function refreshState() {
+  if (!diskReady) return;
+  try {
+    const r = await fetch("/api/state");
+    if (r.ok) acceptState(await r.json());
+  } catch (_) {}
 }
 function closeModal() {
   modal.close();
@@ -106,48 +142,117 @@ function dialog(html) {
 function homeButton() {
   return '<button data-action="home">← Test library</button>';
 }
+function testName(t) {
+  return t.title || `Test ${String(t.id).padStart(2, "0")}`;
+}
+function attemptScore(a) {
+  const t = DATA.find((t) => t.id === a.test);
+  const questions = t.sections
+    .flatMap((s) => s.questions)
+    .filter((q) => !q.disputed);
+  return `${questions.filter((q) => C.grade(q, a.answers[q.id])).length} / ${questions.length}`;
+}
+function attemptStatus(a) {
+  if (a.status === "done") return attemptScore(a);
+  const t = DATA.find((t) => t.id === a.test);
+  const s = t.sections[a.section];
+  if (!s) return "Writing";
+  return a.status === "between"
+    ? `Next: ${s.label}`
+    : `${s.label} · ${a.question + 1}/${s.questions.length}`;
+}
 function renderHome() {
   screen = "home";
   active = null;
   reviewing = false;
   closeTools();
   document.title = "Mock Test";
-  const completed = new Set(
-    db.attempts
-      .filter((a) => a.status === "done" && DATA.some((t) => t.id === a.test))
-      .map((a) => a.test),
-  ).size;
-  app.innerHTML = `<main class="home"><div class="row spread"><div class="brand"><b>M</b>Mock Test</div><div class="row"><button data-action="history">Attempts</button><button data-action="export">Export progress</button><button data-action="help">Help</button></div></div><div class="home-hero"><div><div class="eyebrow">${window.MOCK_TEST_DEMO ? "Demo library" : "Your practice library"}</div><h1 style="margin-top:15px">Your next practice session.</h1><p class="muted">${DATA.length} ${DATA.length === 1 ? "set" : "sets"} · ${DATA.reduce((n, t) => n + t.sections.reduce((m, s) => m + s.questions.length, 0), 0)} questions </p></div><div class="hero-count">${completed}<span>of ${DATA.length} completed</span></div></div><div class="cards">${DATA.map(
+  app.innerHTML = `<main class="home"><header class="row spread"><div class="brand"><b>M</b>Mock Test</div><div class="row"><button data-action="history">Attempts</button><button data-action="help" class="quiet">Help</button></div></header><div class="test-list">${DATA.map(
     (t) => {
-      const attempts = db.attempts.filter((a) => a.test === t.id),
-        last = attempts.at(-1),
-        open = attempts.findLast((a) => a.status !== "done");
-      return `<article class="card"><div class="row spread"><div class="setnumber">PRACTICE ${String(t.id).padStart(2, "0")}</div><span class="pill ${open ? "active" : ""}">${open ? "In progress" : last ? "Completed" : "Ready"}</span></div><h2>Test ${String(t.id).padStart(2, "0")}</h2><div class="section-track">${t.essay ? `<span>Writing · ${t.essayMinutes ?? 30}m</span>` : ""}${t.sections.map((s) => `<span>${s.label} · ${s.minutes}m</span>`).join("")}</div><div class="card-buttons">${open ? `<button class="primary" data-resume="${open.id}">Resume test</button>` : `<button class="primary" data-start="${t.id}">${last ? "New attempt" : "Start test"}</button>`}${last?.status === "done" ? `<button data-results="${last.id}">View results</button>` : open ? `<button data-start="${t.id}">New attempt</button>` : `<span class="muted" style="align-self:center">${(t.essay ? (t.essayMinutes ?? 30) : 0) + t.sections.reduce((n, s) => n + s.minutes, 0)} minutes</span>`}</div></article>`;
+      const attempts = db.attempts.filter((a) => a.test === t.id);
+      const open = attempts.findLast((a) => a.status !== "done");
+      const last = attempts.findLast((a) => a.status === "done");
+      return `<article class="test-row"><div class="test-identity"><h2>${esc(testName(t))}</h2>${open ? `<span class="muted">${esc(attemptStatus(open))}</span>` : last ? `<span class="muted">Latest ${attemptScore(last)}</span>` : ""}</div><div class="row">${attempts.length ? `<button class="quiet" data-history="${t.id}">${attempts.length} ${attempts.length === 1 ? "attempt" : "attempts"}</button>` : ""}${open ? `<button class="primary" data-resume="${open.id}">Resume</button>` : `<button class="primary" data-start="${t.id}">${last ? "Try again" : "Start"}</button>`}</div></article>`;
     },
   ).join("")}</div></main>`;
 }
-function historyDialog() {
-  dialog(
-    `<h2>Your attempts</h2>${
-      db.attempts.length
-        ? '<div class="stack">' +
-          db.attempts
-            .filter((a) => DATA.some((t) => t.id === a.test))
-            .reverse()
-            .map(
-              (a) =>
-                `<div class="row spread"><span><strong>Test ${String(a.test).padStart(2, "0")}</strong><br>${new Date(a.created).toLocaleString()} · ${a.mode === "timed" ? "Timed" : "Untimed"}</span><button ${a.status === "done" ? "data-results" : "data-resume"}="${a.id}">${a.status === "done" ? "Results" : "Resume"}</button></div>`,
-            )
-            .join("") +
-          "</div>"
-        : "<p>No attempts yet.</p>"
-    }<div class="dialog-actions"><button data-action="close">Close</button></div>`,
+function historyAttempts() {
+  return db.attempts
+    .filter(
+      (a) =>
+        DATA.some((t) => t.id === a.test) &&
+        (historyTest === "all" || a.test === Number(historyTest)) &&
+        (historyStatus === "all" ||
+          (historyStatus === "done"
+            ? a.status === "done"
+            : a.status !== "done")),
+    )
+    .sort((a, b) => b.created - a.created);
+}
+function historyDialog(scope = "all") {
+  historyTest = String(scope);
+  historyStatus = "all";
+  selectedAttempts.clear();
+  renderHistory();
+}
+function renderHistory() {
+  closeModal();
+  closeTools();
+  screen = "history";
+  active = null;
+  reviewing = false;
+  const attempts = historyAttempts();
+  selectedAttempts = new Set(
+    [...selectedAttempts].filter((id) => attempts.some((a) => a.id === id)),
   );
+  document.title = "Attempts | Mock Test";
+  app.innerHTML = `<main class="history-page"><header class="row spread">${homeButton()}<div class="row"><button data-action="export">Export</button>${historyTest !== "all" ? `<button class="primary" data-start="${historyTest}">New attempt</button>` : ""}</div></header><h1>Attempts</h1><div class="history-tools row spread"><div class="row"><select id="history-test" aria-label="Filter by test"><option value="all">All tests</option>${DATA.map((t) => `<option value="${t.id}" ${String(t.id) === historyTest ? "selected" : ""}>${esc(testName(t))}</option>`).join("")}</select><select id="history-status" aria-label="Filter by status"><option value="all">All attempts</option><option value="done" ${historyStatus === "done" ? "selected" : ""}>Results</option><option value="open" ${historyStatus === "open" ? "selected" : ""}>In progress</option></select></div><div class="row"><button class="danger ${selectedAttempts.size ? "" : "hidden"}" id="delete-selected" data-action="delete-selected">Delete selected (${selectedAttempts.size})</button>${attempts.some((a) => a.status === "done") ? '<button class="danger quiet" data-action="clear-results">Clear results</button>' : ""}</div></div>${attempts.length ? `<div class="history-table"><table><thead><tr><th><input id="select-attempts" type="checkbox" aria-label="Select all visible attempts" ${selectedAttempts.size === attempts.length ? "checked" : ""}></th><th>Test</th><th>Started</th><th>Mode</th><th>Result / progress</th><th></th></tr></thead><tbody>${attempts.map((a) => `<tr><td><input type="checkbox" data-select-attempt="${a.id}" aria-label="Select attempt from ${esc(new Date(a.created).toLocaleString())}" ${selectedAttempts.has(a.id) ? "checked" : ""}></td><td>${esc(testName(DATA.find((t) => t.id === a.test)))}</td><td>${esc(new Date(a.created).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</td><td>${a.mode === "timed" ? "Timed" : "Untimed"}</td><td>${esc(attemptStatus(a))}</td><td><div class="row"><button ${a.status === "done" ? "data-results" : "data-resume"}="${a.id}">${a.status === "done" ? "Review" : "Resume"}</button><button class="quiet danger" data-delete="${a.id}">Delete</button></div></td></tr>`).join("")}</tbody></table></div>` : '<p class="empty-state">No attempts.</p>'}</main>`;
+}
+function updateSelection() {
+  const attempts = historyAttempts();
+  const button = $("#delete-selected");
+  button.textContent = `Delete selected (${selectedAttempts.size})`;
+  button.classList.toggle("hidden", !selectedAttempts.size);
+  const selectAll = $("#select-attempts");
+  if (selectAll) {
+    selectAll.checked = selectedAttempts.size === attempts.length;
+    selectAll.indeterminate =
+      selectedAttempts.size > 0 && selectedAttempts.size < attempts.length;
+  }
+}
+function deleteDialog(ids, returnTo = screen) {
+  const existing = ids.filter((id) => db.attempts.some((a) => a.id === id));
+  if (!existing.length) return;
+  pendingDelete = { ids: existing, returnTo };
+  const current =
+    active && existing.includes(active.id) && active.status !== "done";
+  dialog(
+    `<h2>${current ? "Clear this attempt?" : `Delete ${existing.length === 1 ? "this attempt" : `${existing.length} attempts`}?`}</h2><p>Answers, writing, and notes will be removed.</p><div class="dialog-actions"><button data-action="close">Cancel</button><button class="danger" data-action="confirm-delete">${current ? "Clear attempt" : "Delete"}</button></div>`,
+  );
+}
+async function deleteAttempts() {
+  if (!pendingDelete) return;
+  const { ids, returnTo } = pendingDelete;
+  pendingDelete = null;
+  db.deleted ||= {};
+  for (const id of ids) db.deleted[id] = Date.now();
+  db.attempts = db.attempts.filter((a) => !ids.includes(a.id));
+  if (active && ids.includes(active.id)) active = null;
+  selectedAttempts.clear();
+  closeModal();
+  save(false);
+  if (returnTo === "history" || returnTo === "results") renderHistory();
+  else renderHome();
+  const saved = await flushDisk();
+  if (saved !== false)
+    notify(
+      ids.length === 1 ? "Attempt cleared." : `${ids.length} attempts cleared.`,
+    );
 }
 function startDialog(id) {
   const t = DATA.find((x) => x.id === id);
   dialog(
-    `<h2>Start Test ${String(id).padStart(2, "0")}</h2><label class="radio-card"><input type="radio" name="mode" value="timed" checked><span><strong>Timed test</strong><br>Each section ends when time runs out.</span></label><label class="radio-card"><input type="radio" name="mode" value="practice"><span><strong>Untimed practice</strong><br>Work at your own pace.</span></label>${t.essay ? `<label class="radio-card"><input id="include-essay" type="checkbox" checked><span>Include writing · ${t.essayMinutes ?? 30} minutes</span></label>` : ""}<div class="section-track">${t.sections.map((s) => `<span>${s.label} · ${s.questions.length} questions</span>`).join("")}</div><div class="dialog-actions"><button data-action="close">Cancel</button><button class="primary" data-begin="${id}">Begin</button></div>`,
+    `<h2>Start Test ${String(id).padStart(2, "0")}</h2><label class="radio-card"><input type="radio" name="mode" value="timed" checked><span><strong>Timed test</strong><br>Each section ends when time runs out.</span></label><label class="radio-card"><input type="radio" name="mode" value="practice"><span><strong>Untimed practice</strong><br>Work at your own pace.</span></label>${t.essay ? `<label class="radio-card"><input id="include-essay" type="checkbox" checked><span>Include writing · ${t.essayMinutes ?? 30} minutes</span></label>` : ""}<div class="section-track">${t.sections.map((s) => `<span>${s.label} · ${s.questions.length} questions · ${s.minutes}m</span>`).join("")}</div><div class="dialog-actions"><button data-action="close">Cancel</button><button class="primary" data-begin="${id}">Begin</button></div>`,
   );
 }
 function begin(id) {
@@ -415,7 +520,7 @@ function renderResults() {
       return `<div class="score-card"><span>${esc(s.title || s.label)}</span><strong>${right} <span class="muted" style="font-size:21px">/ ${scored.length}</span></strong><span class="muted">${formatTime(active.times[t.sections.indexOf(s)] || 0)}</span></div>`;
     })
     .join("");
-  app.innerHTML = `<main class="results"><div class="row spread">${homeButton()}<button data-action="export-attempt">Export this attempt</button></div><div style="margin-top:40px"><div class="eyebrow">Test ${String(t.id).padStart(2, "0")} · ${active.mode === "timed" ? "Timed" : "Untimed"}</div><h1 style="margin-top:16px">${correct} of ${total} correct</h1>${excluded ? `<p class="muted">${excluded} disputed question${excluded > 1 ? "s" : ""} excluded from scoring.</p>` : ""}</div><div class="results-summary">${cards}</div><div class="row spread"><h2 style="margin:0">Review your answers</h2>${active.includeEssay ? '<button data-action="review-essay">Read your essay</button>' : ""}</div>${t.sections
+  app.innerHTML = `<main class="results"><div class="row spread"><button data-action="results-history">← Attempts</button><div class="row"><button data-action="export-attempt">Export</button><button class="danger quiet" data-action="delete-current">Delete result</button></div></div><div style="margin-top:40px"><div class="eyebrow">Test ${String(t.id).padStart(2, "0")} · ${active.mode === "timed" ? "Timed" : "Untimed"}</div><h1 style="margin-top:16px">${correct} of ${total} correct</h1>${excluded ? `<p class="muted">${excluded} disputed question${excluded > 1 ? "s" : ""} excluded from scoring.</p>` : ""}</div><div class="results-summary">${cards}</div><div class="row spread"><h2 style="margin:0">Review your answers</h2>${active.includeEssay ? '<button data-action="review-essay">Read your essay</button>' : ""}</div>${t.sections
     .map(
       (s, si) =>
         `<h3 style="margin-top:32px">${s.label}</h3><table><thead><tr><th>Question</th><th>Your answer</th><th>Key</th><th>Result</th></tr></thead><tbody>${s.questions
@@ -645,14 +750,33 @@ async function action(name) {
       renderTest();
       break;
     case "leave":
-      if (active.mode === "timed")
-        dialog(
-          '<h2>Save and leave?</h2><p>Your answers are saved. The section clock will continue while you are away.</p><div class="dialog-actions"><button data-action="close">Keep working</button><button class="primary" data-action="home">Leave test</button></div>',
-        );
-      else {
-        save();
-        renderHome();
-      }
+      dialog(
+        `<h2>Leave this attempt?</h2>${active.mode === "timed" ? "<p>The clock continues while you are away.</p>" : ""}<div class="dialog-actions"><button class="danger quiet" data-action="delete-current">Clear attempt</button><button data-action="close">Keep working</button><button class="primary" data-action="save-exit">Save & exit</button></div>`,
+      );
+      break;
+    case "save-exit":
+      save();
+      closeModal();
+      renderHome();
+      break;
+    case "results-history":
+      historyDialog(active.test);
+      break;
+    case "delete-current":
+      deleteDialog([active.id]);
+      break;
+    case "delete-selected":
+      deleteDialog([...selectedAttempts]);
+      break;
+    case "clear-results":
+      deleteDialog(
+        historyAttempts()
+          .filter((a) => a.status === "done")
+          .map((a) => a.id),
+      );
+      break;
+    case "confirm-delete":
+      await deleteAttempts();
       break;
     case "results":
       renderResults();
@@ -684,6 +808,8 @@ document.addEventListener("click", (e) => {
   const el = e.target.closest("button,[data-review]");
   if (!el || el.disabled) return;
   if (el.dataset.action) action(el.dataset.action);
+  else if (el.dataset.history) historyDialog(el.dataset.history);
+  else if (el.dataset.delete) deleteDialog([el.dataset.delete]);
   else if (el.dataset.start) startDialog(+el.dataset.start);
   else if (el.dataset.begin) begin(+el.dataset.begin);
   else if (el.dataset.resume) resume(el.dataset.resume);
@@ -710,6 +836,37 @@ document.addEventListener("click", (e) => {
     enterReview(si, qi);
   }
 });
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.id === "history-test") {
+    historyTest = el.value;
+    selectedAttempts.clear();
+    renderHistory();
+  } else if (el.id === "history-status") {
+    historyStatus = el.value;
+    selectedAttempts.clear();
+    renderHistory();
+  } else if (el.id === "select-attempts") {
+    selectedAttempts = new Set(
+      el.checked ? historyAttempts().map((a) => a.id) : [],
+    );
+    document
+      .querySelectorAll("[data-select-attempt]")
+      .forEach((box) => (box.checked = el.checked));
+    updateSelection();
+  } else if (el.dataset.selectAttempt) {
+    if (el.checked) selectedAttempts.add(el.dataset.selectAttempt);
+    else selectedAttempts.delete(el.dataset.selectAttempt);
+    updateSelection();
+  }
+});
+window.addEventListener("storage", (e) => {
+  if (e.key === "mock-test-v1" && e.newValue) {
+    try {
+      acceptState(JSON.parse(e.newValue), false);
+    } catch (_) {}
+  }
+});
 document.addEventListener("keydown", (e) => {
   if (e.target.matches("[data-review]") && e.key === "Enter") e.target.click();
 });
@@ -724,6 +881,9 @@ window.addEventListener("pagehide", () => {
 });
 setInterval(updateTimer, 250);
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) updateTimer();
+  if (!document.hidden) {
+    refreshState();
+    updateTimer();
+  }
 });
 init();

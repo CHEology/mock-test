@@ -100,6 +100,37 @@
     if (i !== src.length || !Number.isFinite(v)) throw Error("Invalid result");
     return Number(v.toPrecision(12));
   }
-  root.MockTestCore = { numeric, answered, grade, display, calculate };
+  function mergeState(...states) {
+    const deleted = Object.create(null),
+      attempts = new Map();
+    let updated = 0;
+    for (const state of states.filter(Boolean)) {
+      updated = Math.max(updated, state.updated || 0);
+      for (const [id, time] of Object.entries(state.deleted || {}))
+        deleted[id] = Math.max(deleted[id] || 0, time);
+      for (const attempt of state.attempts || []) {
+        const old = attempts.get(attempt.id);
+        const time = attempt.updated ?? state.updated ?? attempt.created ?? 0;
+        if (!old || time >= (old.updated || 0))
+          attempts.set(attempt.id, { ...attempt, updated: time });
+      }
+    }
+    return {
+      version: 1,
+      updated,
+      deleted,
+      attempts: [...attempts.values()]
+        .filter((a) => !Object.hasOwn(deleted, a.id))
+        .sort((a, b) => (a.created || 0) - (b.created || 0)),
+    };
+  }
+  root.MockTestCore = {
+    numeric,
+    answered,
+    grade,
+    display,
+    calculate,
+    mergeState,
+  };
   if (typeof module !== "undefined") module.exports = root.MockTestCore;
 })(typeof window === "undefined" ? globalThis : window);

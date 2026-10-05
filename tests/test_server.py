@@ -69,3 +69,26 @@ class ServerTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as error:
                 self.request('/api/state', value)
             self.assertEqual(error.exception.code, 400)
+
+    def test_deleted_attempt_never_returns_from_a_stale_tab(self):
+        self.request('/api/state', {'version':1,'updated':100,'attempts':[{'id':'a','updated':100,'answers':{'q':'B'}},{'id':'b','updated':100}]})
+        reply = json.loads(self.request('/api/state', {'version':1,'updated':200,'attempts':[],'deleted':{'a':200}}))
+        self.assertEqual([a['id'] for a in reply['state']['attempts']], ['b'])
+        self.request('/api/state', {'version':1,'updated':300,'attempts':[{'id':'a','updated':300,'answers':{'q':'A'}}]})
+        saved = json.loads(self.request('/api/state'))
+        self.assertEqual([a['id'] for a in saved['attempts']], ['b'])
+        self.assertEqual(saved['deleted'], {'a':200})
+
+    def test_independent_deletions_are_preserved(self):
+        self.request('/api/state', {'version':1,'attempts':[],'deleted':{'a':100}})
+        self.request('/api/state', {'version':1,'attempts':[],'deleted':{'b':200}})
+        self.assertEqual(json.loads(self.request('/api/state'))['deleted'], {'a':100,'b':200})
+
+    def test_invalid_deletions_cannot_remove_saved_answers(self):
+        self.request('/api/state', {'version':1,'attempts':[{'id':'a','answers':{'q':'B'}}]})
+        for deleted in [[], {'a':'bad'}, {'a':float('inf')}, {'a':-1}]:
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                self.request('/api/state', {'version':1,'attempts':[],'deleted':deleted})
+            self.assertEqual(error.exception.code,400)
+        saved=json.loads(self.request('/api/state'))
+        self.assertEqual(saved['attempts'][0]['answers'],{'q':'B'})
