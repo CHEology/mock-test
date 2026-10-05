@@ -56,7 +56,10 @@ test("moving tests and folders enforces exactly two organization tiers", () => {
   ];
   const moved = L.move(records, ["test-1"], "folder2", 30);
   assert.equal(moved.find((r) => r.id === "test-1").parent, "folder2");
-  assert.throws(() => L.move(records, ["test-1"], "cat2"));
+  assert.equal(
+    L.move(records, ["test-1"], "cat2").find((r) => r.id === "test-1").parent,
+    "cat2",
+  );
   assert.throws(() => L.move(records, ["folder-default"], "folder2"));
   assert.throws(() => L.move(records, ["category-default"], "cat2"));
   assert.throws(() =>
@@ -146,4 +149,38 @@ test("category and folder scopes isolate their tests, including saved history of
   assert.deepEqual([...L.testIds(moved, "other-category")].sort(), [1, 3]);
   const trashed = L.trash(records, ["test-1"], 200);
   assert.deepEqual([...L.testIds(trashed, "folder-default")], [1]);
+});
+
+test("parent-directory moves preserve test identity and category attempt scope", () => {
+  const records = initial();
+  const moved = L.move(records, ["test-1"], "category-default", 55);
+  assert.deepEqual([...L.testIds(moved, "category-default")], [1]);
+  assert.deepEqual([...L.testIds(moved, "folder-default")], []);
+  assert.equal(moved.find((r) => r.id === "test-1").testId, 1);
+  assert.equal(records.find((r) => r.id === "test-1").parent, "folder-default");
+  assert.throws(() => L.move(records, ["folder-default"], "folder-default"));
+  assert.throws(() =>
+    L.move(records, ["test-1", "folder-default"], "folder-writing"),
+  );
+});
+
+test("bulk moves are atomic and retain descendant test scope", () => {
+  const records = [
+    ...initial(),
+    { id: "other", kind: "category", name: "Other" },
+  ];
+  const moved = L.move(
+    records,
+    ["folder-default", "folder-writing"],
+    "other",
+    80,
+  );
+  assert.deepEqual([...L.testIds(moved, "other")], [1]);
+  assert.equal(moved.find((r) => r.id === "test-1").parent, "folder-default");
+  assert.deepEqual([...L.testIds(records, "category-default")], [1]);
+  assert.throws(() => L.move(records, ["folder-default", "missing"], "other"));
+  assert.equal(
+    records.find((r) => r.id === "folder-default").parent,
+    "category-default",
+  );
 });

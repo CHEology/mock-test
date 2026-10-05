@@ -58,13 +58,15 @@
           !r ||
           !visible(records, r) ||
           (r.kind === "test"
-            ? target.kind !== "folder"
+            ? !["folder", "category"].includes(target.kind)
             : r.kind === "folder"
               ? target.kind !== "category"
               : true),
       )
     )
-      throw Error("Folders belong to categories; tests belong to folders.");
+      throw Error(
+        "Folders belong to categories; tests belong to categories or folders.",
+      );
     return records.map((r) =>
       ids.includes(r.id) ? { ...r, parent, updated: now } : r,
     );
@@ -207,7 +209,8 @@
             (scope === "all" ||
               (group?.kind === "folder" && r.parent === scope) ||
               (group?.kind === "category" &&
-                records.find((p) => p.id === r.parent)?.parent === scope)),
+                (r.parent === scope ||
+                  records.find((p) => p.id === r.parent)?.parent === scope))),
         )
         .map((r) => r.testId),
     );

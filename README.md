@@ -3,7 +3,7 @@
 A general-purpose mock-test interface that runs locally in your browser. Plain JavaScript, CSS, and a Python standard-library server; no account or build step.
 
 - Two-level library: categories and folders, with scoped attempt tabs and a collapsible sidebar
-- Search, move, rename, and recoverable Trash
+- Anchored action menus, in-page editing, box selection, drag-to-move, and recoverable Trash
 - Writing-task creation, section-specific practice copies, and JSON import/export
 - Full-screen focus mode by default, with a per-test opt-out and saved Settings
 - Configurable sections, timing, and optional writing tasks
@@ -22,6 +22,8 @@ python3 launch.py
 This starts the local server and opens **http://127.0.0.1:17654** in Chrome on macOS when installed, or your default browser otherwise. Use `MOCK_TEST_PORT=17655 python3 launch.py` to choose another port. To run in the foreground instead, use `python3 server.py`.
 
 The sidebar can stay pinned or auto-hide: move to the left edge to reveal it, move away to hide it, and use its corner button to pin it again. Help and Settings open in the main content area. Settings changes apply and save immediately across open tabs. Timer visibility and sidebar changes also update active views; test mode and writing defaults apply to new attempts. Settings controls default focus mode, timed/untimed mode, writing, timer visibility, and the sidebar. Focus mode uses the browser’s Fullscreen API: Esc or **Exit focus** returns to the normal window, and finishing or leaving a test exits automatically. Browser permission restrictions may prevent automatic full screen; the test still starts. Preferences are saved in this browser.
+
+Drag across empty space to select items, or use Command/Ctrl-click to select individually. Drag tests and folders onto destinations in the page, breadcrumbs, or sidebar. Hold over a directory to open it during a drag; the left edge reveals the auto-hidden sidebar. Tests can live directly in a category or inside its folders.
 
 ## Add your questions
 

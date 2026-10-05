@@ -135,6 +135,8 @@ function acceptState(state, persist = true) {
     notify("This attempt was cleared.");
   } else if (
     screen === "home" &&
+    !libraryGesture &&
+    !$("#library-context-menu") &&
     !modal.open &&
     document.activeElement?.id !== "library-search"
   )
