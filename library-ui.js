@@ -853,6 +853,14 @@ document.addEventListener(
       e.stopImmediatePropagation();
       return;
     }
+    const itemMenu = e.target.closest("[data-lib-menu]");
+    const selectionAction =
+      e.target.closest("#library-context-menu") ||
+      (itemMenu && librarySelection.has(itemMenu.dataset.libMenu));
+    if (screen === "home" && librarySelection.size && !selectionAction) {
+      librarySelection.clear();
+      paintLibrarySelection();
+    }
     if (
       !e.target.closest(
         "#library-context-menu, [data-lib-menu], [data-lib-add]",
