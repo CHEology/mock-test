@@ -77,16 +77,18 @@ function peekLibrarySidebar(show) {
   shell.classList.toggle("sidebar-peeking", show);
   sidebar.inert = !show;
 }
-function toggleLibrarySidebar() {
+function setLibrarySidebar(hidden, persist = true) {
   clearTimeout(sidebarHideTimer);
   sidebarHideTimer = null;
-  sidebarHidden = !sidebarHidden;
+  sidebarHidden = hidden;
   sidebarPeek = false;
   try {
-    localStorage.setItem("mock-sidebar-hidden", String(sidebarHidden));
+    if (persist)
+      localStorage.setItem("mock-sidebar-hidden", String(sidebarHidden));
   } catch (_) {}
   const shell = $(".library-shell"),
     sidebar = $("#library-sidebar");
+  if (!shell || !sidebar) return;
   shell.classList.toggle("sidebar-hidden", sidebarHidden);
   shell.classList.remove("sidebar-peeking");
   if (sidebarHidden && sidebar.contains(document.activeElement))
@@ -101,6 +103,9 @@ function toggleLibrarySidebar() {
   );
   button.title = sidebarHidden ? "Pin sidebar" : "Auto-hide sidebar";
   if ($("#setting-sidebar")) $("#setting-sidebar").checked = !sidebarHidden;
+}
+function toggleLibrarySidebar() {
+  setLibrarySidebar(!sidebarHidden);
 }
 document.addEventListener("pointermove", (e) => {
   if (!sidebarHidden || !$(".library-shell") || e.pointerType === "touch")

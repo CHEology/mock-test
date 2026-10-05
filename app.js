@@ -25,11 +25,16 @@ let db = { version: 1, attempts: [], deleted: {} },
   calcMemory = 0,
   settings = C.preferences(),
   focusOwned = false;
-try {
-  settings = C.preferences(
-    JSON.parse(localStorage.getItem("mock-test-settings")),
-  );
-} catch (_) {}
+function readSettings() {
+  try {
+    return C.preferences(
+      JSON.parse(localStorage.getItem("mock-test-settings")),
+    );
+  } catch (_) {
+    return settings;
+  }
+}
+settings = readSettings();
 const esc = (v) =>
   String(v ?? "").replace(
     /[&<>"']/g,
@@ -297,6 +302,7 @@ async function deleteAttempts() {
     );
 }
 function startDialog(id) {
+  settings = readSettings();
   const t = DATA.find((x) => x.id === id);
   dialog(
     `<h2>Start ${esc(testName(t))}</h2><label class="radio-card"><input type="radio" name="mode" value="timed" ${settings.mode === "timed" ? "checked" : ""}><span><strong>Timed test</strong><br>Each section ends when time runs out.</span></label><label class="radio-card"><input type="radio" name="mode" value="practice" ${settings.mode === "practice" ? "checked" : ""}><span><strong>Untimed practice</strong><br>Work at your own pace.</span></label>${t.essay ? `<label class="radio-card"><input id="include-essay" type="checkbox" ${settings.includeWriting || !t.sections.length ? "checked" : ""} ${!t.sections.length ? "disabled" : ""}><span>Include writing · ${t.essayMinutes ?? 30} minutes</span></label>` : ""}<label class="radio-card"><input id="start-focus" type="checkbox" ${settings.focusMode ? "checked" : ""}><span>Focus mode · full screen</span></label><div class="section-track">${t.sections.map((s) => `<span>${esc(s.label)} · ${s.questions.length} questions · ${s.minutes}m</span>`).join("")}</div><div class="dialog-actions"><button data-action="close">Cancel</button><button class="primary" data-begin="${id}">Begin</button></div>`,
@@ -344,6 +350,7 @@ function startClock() {
       : null;
 }
 function resume(id) {
+  settings = readSettings();
   testHelpOpen = false;
   active = db.attempts.find((a) => a.id === id);
   reviewing = false;
@@ -794,27 +801,66 @@ function renderInfoPage(name, content) {
   );
 }
 function renderSettings() {
+  settings = readSettings();
   renderInfoPage(
     "Settings",
-    `<form id="settings-form" class="settings-form"><section class="settings-section"><h2>Testing</h2><label class="setting-row"><span>Full-screen focus mode</span><input id="setting-focus" type="checkbox" ${settings.focusMode ? "checked" : ""}></label><label class="setting-row"><span>Default test mode</span><select id="setting-mode"><option value="timed" ${settings.mode === "timed" ? "selected" : ""}>Timed</option><option value="practice" ${settings.mode === "practice" ? "selected" : ""}>Untimed</option></select></label><label class="setting-row"><span>Include writing by default</span><input id="setting-writing" type="checkbox" ${settings.includeWriting ? "checked" : ""}></label></section><section class="settings-section"><h2>Display</h2><label class="setting-row"><span>Show timer</span><input id="setting-timer" type="checkbox" ${settings.showTimer ? "checked" : ""}></label><label class="setting-row"><span>Keep sidebar open</span><input id="setting-sidebar" type="checkbox" ${!sidebarHidden ? "checked" : ""}></label></section></form>`,
+    `<form id="settings-form" class="settings-form"><section class="settings-section"><h2>Testing</h2><label class="setting-row"><span>Start tests in focus mode</span><input id="setting-focus" type="checkbox" ${settings.focusMode ? "checked" : ""}></label><label class="setting-row"><span>Default test mode</span><select id="setting-mode"><option value="timed" ${settings.mode === "timed" ? "selected" : ""}>Timed</option><option value="practice" ${settings.mode === "practice" ? "selected" : ""}>Untimed</option></select></label><label class="setting-row"><span>Include writing by default</span><input id="setting-writing" type="checkbox" ${settings.includeWriting ? "checked" : ""}></label></section><section class="settings-section"><h2>Display</h2><label class="setting-row"><span>Show timer</span><input id="setting-timer" type="checkbox" ${settings.showTimer ? "checked" : ""}></label><label class="setting-row"><span>Keep sidebar open</span><input id="setting-sidebar" type="checkbox" ${!sidebarHidden ? "checked" : ""}></label></section></form>`,
   );
   $("#settings-form").onsubmit = (e) => e.preventDefault();
-  $("#settings-form").onchange = () => {
-    settings = C.preferences({
-      focusMode: $("#setting-focus").checked,
-      mode: $("#setting-mode").value,
-      includeWriting: $("#setting-writing").checked,
-      showTimer: $("#setting-timer").checked,
+  $("#settings-form").onchange = (e) => {
+    if (e.target.id === "setting-sidebar") {
+      setLibrarySidebar(!e.target.checked);
+      return;
+    }
+    const keys = {
+      "setting-focus": "focusMode",
+      "setting-mode": "mode",
+      "setting-writing": "includeWriting",
+      "setting-timer": "showTimer",
+    };
+    const key = keys[e.target.id];
+    if (!key) return;
+    // Read the latest values so an older tab cannot overwrite another change.
+    const next = C.preferences({
+      ...readSettings(),
+      [key]: key === "mode" ? e.target.value : e.target.checked,
     });
-    const hideSidebar = !$("#setting-sidebar").checked;
     try {
-      localStorage.setItem("mock-test-settings", JSON.stringify(settings));
+      localStorage.setItem("mock-test-settings", JSON.stringify(next));
     } catch (_) {
       notify("Settings could not be saved in this browser.");
     }
-    if (hideSidebar !== sidebarHidden) toggleLibrarySidebar();
+    applySettings(next);
   };
 }
+function applySettings(next) {
+  const timerChanged = settings.showTimer !== next.showTimer;
+  settings = next;
+  for (const [id, key] of Object.entries({
+    "setting-focus": "focusMode",
+    "setting-writing": "includeWriting",
+    "setting-timer": "showTimer",
+  })) {
+    if ($("#" + id)) $("#" + id).checked = settings[key];
+  }
+  if ($("#setting-mode")) $("#setting-mode").value = settings.mode;
+  if (!settings.focusMode) leaveFocusMode();
+  if (timerChanged && screen === "test") {
+    hideTime = !settings.showTimer;
+    const button = $('[data-action="time"]');
+    if (button) button.textContent = hideTime ? "Show time" : "Hide time";
+    updateTimer();
+  }
+  if ($("#start-focus")) {
+    $("#start-focus").checked = settings.focusMode;
+    document.querySelectorAll('input[name="mode"]').forEach((input) => {
+      input.checked = input.value === settings.mode;
+    });
+    const writing = $("#include-essay");
+    if (writing && !writing.disabled) writing.checked = settings.includeWriting;
+  }
+}
+
 function helpContent(inTest = false) {
   return `<div class="help-content">${inTest ? "" : "<section><h2>Your library</h2><p>Organize tests into categories and folders. Use the ··· menu to rename, move, or create a practice copy. Restore removed items from Trash.</p></section>"}<section><h2>Answering questions</h2><p>Select answers on the right. Unlabelled choices follow their order in the question; each blank starts at A. Numeric answers accept decimals or fractions. For sentence-selection questions, click the passage directly.</p><p>Use Mark and Review to revisit questions within the current section. Calculator and Scratchpad are available from the test toolbar.</p></section><section><h2>Timing and progress</h2><p>Progress saves automatically. Timed sections keep counting while you read Help or leave the test. Save &amp; exit lets you return later; finishing a section moves you forward.</p></section><section><h2>Attempts and results</h2><p>Each category and folder has its own Attempts tab. Resume, review, export, or delete attempts there. Results use the supplied answer key; writing is saved without automatic grading.</p></section><section><h2>Focus mode</h2><p>Tests open full screen by default. Press Esc or Exit focus to leave full screen. Change the default in Settings or turn it off before starting a test.</p></section></div>`;
 }
@@ -1024,6 +1070,14 @@ document.addEventListener("change", (e) => {
   }
 });
 window.addEventListener("storage", (e) => {
+  if (e.key === "mock-test-settings" || e.key === null)
+    applySettings(readSettings());
+  if (e.key === "mock-sidebar-hidden" || e.key === null) {
+    setLibrarySidebar(
+      localStorage.getItem("mock-sidebar-hidden") === "true",
+      false,
+    );
+  }
   if (e.key === "mock-test-v1" && e.newValue) {
     try {
       acceptState(JSON.parse(e.newValue), false);
@@ -1045,6 +1099,9 @@ window.addEventListener("pagehide", () => {
 setInterval(updateTimer, 250);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
+    applySettings(readSettings());
+    const hidden = localStorage.getItem("mock-sidebar-hidden") === "true";
+    if (hidden !== sidebarHidden) setLibrarySidebar(hidden, false);
     refreshState();
     updateTimer();
   }
