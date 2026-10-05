@@ -867,10 +867,39 @@ document.addEventListener(
       )
     )
       closeLibraryMenu();
+    if (
+      !e.target.closest("button,input,select,textarea,a") &&
+      openLibraryCard(e.target)
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
   },
   true,
 );
+function openLibraryCard(target) {
+  const row = target.closest("[data-lib-item]");
+  const item = row && libItem(row.dataset.libItem);
+  if (
+    screen !== "home" ||
+    libraryLocation === "trash" ||
+    !item ||
+    !["folder", "category"].includes(item.kind) ||
+    !libVisible(item)
+  )
+    return false;
+  libraryNavigate(item.id);
+  return true;
+}
 document.addEventListener("keydown", (e) => {
+  if (
+    e.key === "Enter" &&
+    e.target.matches("[data-lib-item]") &&
+    openLibraryCard(e.target)
+  ) {
+    e.preventDefault();
+    return;
+  }
   const menu = $("#library-context-menu");
   if (e.key === "Escape") {
     if (libraryGesture) finishLibraryGesture(true);

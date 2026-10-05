@@ -1526,3 +1526,7 @@ dialog h2 {
   width: fit-content;
   max-width: 100%;
 }
+
+.folder-card:has(.folder-open) {
+  cursor: pointer;
+}
