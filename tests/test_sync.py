@@ -4,6 +4,7 @@ import tempfile
 import plistlib
 import sys
 import unittest
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location('app_sync', Path(__file__).resolve().parents[1] / 'sync.py')
 sync = importlib.util.module_from_spec(SPEC)
@@ -25,7 +26,11 @@ class SyncTests(unittest.TestCase):
             (destination / '.progress').mkdir(parents=True)
             saved = destination / '.progress' / 'progress.json'
             saved.write_text('{"existing": "answers"}')
-            sync.sync(destination)
+            def build(command, **kwargs):
+                if 'swiftc' in command:
+                    Path(command[-1]).touch()
+            with patch.object(sync.subprocess, 'run', side_effect=build):
+                sync.sync(destination)
             for name in sync.SHARED:
                 self.assertEqual((destination / name).read_bytes(), (sync.ROOT / name).read_bytes())
             self.assertEqual((destination / 'data.js').read_text(), 'private questions')

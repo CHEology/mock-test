@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import plistlib
 import shutil
+import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent
@@ -35,12 +36,19 @@ def sync(destination):
                 'CFBundleName': 'Mock Test',
                 'CFBundleIconFile': 'MockTest.icns',
                 'CFBundlePackageType': 'APPL',
-                'CFBundleVersion': '1.0.1',
+                'CFBundleVersion': '1.0.2',
+                'NSDesktopFolderUsageDescription': 'Read your local question files and save your practice progress.',
                 'LSUIElement': True,
             }, stream)
         executable = contents / 'MacOS' / 'launch'
-        executable.write_text('#!/bin/zsh\nAPP_DIR="${0:A:h:h:h:h}"\nexec /usr/bin/python3 "$APP_DIR/launch.py"\n')
+        subprocess.run(['xcrun', 'swiftc', str(ROOT / 'macos' / 'Launcher.swift'),
+                        '-o', str(executable)], check=True)
         executable.chmod(0o755)
+        for item in [contents.parent, *contents.parent.rglob('*')]:
+            for attribute in ('com.apple.FinderInfo', 'com.apple.ResourceFork'):
+                subprocess.run(['xattr', '-d', attribute, str(item)],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        subprocess.run(['codesign', '--force', '--sign', '-', str(contents.parent)], check=True)
     CONFIG.write_text(json.dumps({'destination': str(destination)}, indent=2) + '\n')
     return destination
 

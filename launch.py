@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the local app and open it in the default browser."""
+"""Start the local app and open its browser window."""
 import json
 import os
 from pathlib import Path
@@ -21,7 +21,20 @@ def running():
     except (OSError, ValueError):
         return False
 
-if __name__ == '__main__':
+def open_page():
+    if sys.platform == 'darwin':
+        candidates = (Path('/Applications/Google Chrome.app'),
+                      Path.home() / 'Applications/Google Chrome.app')
+        chrome = next((path for path in candidates if path.exists()), None)
+        command = ['/usr/bin/open']
+        if chrome:
+            command += ['-a', str(chrome)]
+        subprocess.run(command + [URL], check=True, timeout=15)
+    elif not webbrowser.open(URL, new=2):
+        raise RuntimeError(f'Could not open a browser. Open {URL} manually.')
+
+
+def main():
     if not running():
         logs = ROOT / '.progress'
         logs.mkdir(exist_ok=True)
@@ -39,4 +52,16 @@ if __name__ == '__main__':
             time.sleep(0.1)
         else:
             raise SystemExit('The server did not start. Check .progress/server.log.')
-    webbrowser.open(URL)
+    open_page()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (Exception, SystemExit) as error:
+        message = str(error)
+        print(message, file=sys.stderr)
+        if sys.platform == 'darwin':
+            script = 'on run argv\ndisplay alert "Mock Test could not open" message (item 1 of argv)\nend run'
+            subprocess.run(['/usr/bin/osascript', '-e', script, message], check=False)
+        raise SystemExit(1)

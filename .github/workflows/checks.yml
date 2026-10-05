@@ -15,3 +15,8 @@ jobs:
           python-version: '3.12'
       - run: node --test tests/core.test.cjs
       - run: python -m unittest discover -s tests
+  macos-launcher:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcrun swiftc macos/Launcher.swift -o "$RUNNER_TEMP/mock-test-launcher"

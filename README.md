@@ -15,7 +15,7 @@ Requires Python 3 and a modern browser.
 python3 launch.py
 ```
 
-This starts the local server and opens **http://127.0.0.1:17654**. Use `MOCK_TEST_PORT=17655 python3 launch.py` to choose another port. To run in the foreground instead, use `python3 server.py`.
+This starts the local server and opens **http://127.0.0.1:17654** in Chrome on macOS when installed, or your default browser otherwise. Use `MOCK_TEST_PORT=17655 python3 launch.py` to choose another port. To run in the foreground instead, use `python3 server.py`.
 
 ## Add your questions
 
@@ -29,7 +29,7 @@ Questions can use `text`, `labels`, and `options`, or an `image` path such as `a
 python3 sync.py /path/to/local-copy
 ```
 
-This copies the app and any local question bank without replacing saved attempts. On macOS it also creates **Mock Test.app**. Later, run `python3 sync.py` to update the same destination; its path is stored in an ignored local configuration file.
+This copies the app and any local question bank without replacing saved attempts. On macOS it also creates **Mock Test.app** using the Xcode Command Line Tools. Later, run `python3 sync.py` to update the same destination; its path is stored in an ignored local configuration file.
 
 ## Test
 
