@@ -21,7 +21,14 @@ let db = { version: 1, attempts: [], deleted: {} },
   saveChain = Promise.resolve(),
   saveTimer,
   calcValue = "",
-  calcMemory = 0;
+  calcMemory = 0,
+  settings = C.preferences(),
+  focusOwned = false;
+try {
+  settings = C.preferences(
+    JSON.parse(localStorage.getItem("mock-test-settings")),
+  );
+} catch (_) {}
 const esc = (v) =>
   String(v ?? "").replace(
     /[&<>"']/g,
@@ -179,6 +186,7 @@ function attemptStatus(a) {
     : `${s.label} · ${a.question + 1}/${s.questions.length}`;
 }
 function renderHome() {
+  leaveFocusMode();
   screen = "home";
   active = null;
   reviewing = false;
@@ -223,6 +231,7 @@ function groupHistory(group) {
   renderHistory();
 }
 function renderHistory() {
+  leaveFocusMode();
   closeModal();
   closeTools();
   screen = "history";
@@ -287,7 +296,7 @@ async function deleteAttempts() {
 function startDialog(id) {
   const t = DATA.find((x) => x.id === id);
   dialog(
-    `<h2>Start ${esc(testName(t))}</h2><label class="radio-card"><input type="radio" name="mode" value="timed" checked><span><strong>Timed test</strong><br>Each section ends when time runs out.</span></label><label class="radio-card"><input type="radio" name="mode" value="practice"><span><strong>Untimed practice</strong><br>Work at your own pace.</span></label>${t.essay ? `<label class="radio-card"><input id="include-essay" type="checkbox" checked ${!t.sections.length ? "disabled" : ""}><span>Include writing · ${t.essayMinutes ?? 30} minutes</span></label>` : ""}<div class="section-track">${t.sections.map((s) => `<span>${esc(s.label)} · ${s.questions.length} questions · ${s.minutes}m</span>`).join("")}</div><div class="dialog-actions"><button data-action="close">Cancel</button><button class="primary" data-begin="${id}">Begin</button></div>`,
+    `<h2>Start ${esc(testName(t))}</h2><label class="radio-card"><input type="radio" name="mode" value="timed" ${settings.mode === "timed" ? "checked" : ""}><span><strong>Timed test</strong><br>Each section ends when time runs out.</span></label><label class="radio-card"><input type="radio" name="mode" value="practice" ${settings.mode === "practice" ? "checked" : ""}><span><strong>Untimed practice</strong><br>Work at your own pace.</span></label>${t.essay ? `<label class="radio-card"><input id="include-essay" type="checkbox" ${settings.includeWriting || !t.sections.length ? "checked" : ""} ${!t.sections.length ? "disabled" : ""}><span>Include writing · ${t.essayMinutes ?? 30} minutes</span></label>` : ""}<label class="radio-card"><input id="start-focus" type="checkbox" ${settings.focusMode ? "checked" : ""}><span>Focus mode · full screen</span></label><div class="section-track">${t.sections.map((s) => `<span>${esc(s.label)} · ${s.questions.length} questions · ${s.minutes}m</span>`).join("")}</div><div class="dialog-actions"><button data-action="close">Cancel</button><button class="primary" data-begin="${id}">Begin</button></div>`,
   );
 }
 function begin(id) {
@@ -302,6 +311,7 @@ function begin(id) {
     test: id,
     mode,
     includeEssay: essay,
+    focusMode: !!$("#start-focus")?.checked,
     status: "running",
     section: essay ? -1 : 0,
     question: 0,
@@ -314,11 +324,13 @@ function begin(id) {
     created: Date.now(),
   };
   db.attempts.push(active);
+  hideTime = !settings.showTimer;
   reviewing = false;
   closeModal();
   startClock();
   save();
   renderTest();
+  if (active.focusMode) enterFocusMode();
 }
 function startClock() {
   active.started = Date.now();
@@ -332,6 +344,13 @@ function resume(id) {
   reviewing = false;
   if (!active) return;
   closeModal();
+  hideTime = !settings.showTimer;
+  if (
+    active.status !== "done" &&
+    settings.focusMode &&
+    active.focusMode !== false
+  )
+    enterFocusMode();
   if (active.status === "between") {
     renderBetween();
     return;
@@ -413,7 +432,7 @@ function renderTest() {
     q = question(),
     essay = !s;
   document.title = `${testName(test())} · ${s?.label || "Writing"} | Mock Test`;
-  app.innerHTML = `<div class="test-shell"><header class="test-top"><div class="brand"><b>M</b>Mock Test <span class="sub">${esc(testName(test()))} · ${esc(s?.title || s?.label || "Writing")}</span></div><div class="row">${reviewing ? "<strong>Answer review</strong>" : `<span id="timer" class="timer"></span><button data-action="time">${hideTime ? "Show" : "Hide"} time</button>`}<button data-action="fullscreen" aria-label="Toggle full screen">Full screen</button></div></header><div class="toolbar"><h2>${essay ? "Writing" : `${esc(s.label)} · Question ${q.number} of ${s.questions.length}`}</h2><div class="row">${s?.calculator ? '<button data-action="calculator">Calculator</button>' : ""}<button data-action="scratch">Scratchpad</button>${!essay ? `<button data-action="flag" class="${active.flags[q.id] ? "marked" : ""}" aria-pressed="${!!active.flags[q.id]}">${active.flags[q.id] ? "★ Marked" : "☆ Mark"}</button><button data-action="review">Review</button>` : ""}<button data-action="help">Help</button></div></div><div class="workspace"><main class="question-pane">${essay ? essayHTML() : q.type === "sentence" ? `<div class="sentence-layout"><div class="passage">${q.sentences.map((x, i) => `<button class="sentence ${answerValue() === letters(q.count)[i] ? "selected" : ""}" data-choice="${letters(q.count)[i]}" aria-pressed="${answerValue() === letters(q.count)[i]}" ${reviewing ? "disabled" : ""}>${esc(x)}</button> `).join("")}</div><div class="sentence-prompt">${esc(q.prompt)}</div></div>` : q.text ? textQuestion(q) : `<div class="image-frame" style="width:${zoom}%"><img class="question-image" style="max-width:${(1100 * zoom) / 100}px" src="${q.image}" alt="Test ${active.test}, ${esc(s.label)}, question ${q.number}" draggable="false"></div>`}</main>${essay ? "" : `<aside class="answer-panel">${controls(q)}</aside>`}</div><nav class="bottom-nav"><div class="row">${reviewing ? '<button data-action="results">← Results</button>' : '<button data-action="leave">Save & exit</button>'}${!essay ? `<div class="zoom-controls"><button data-zoom="-10" aria-label="Zoom out">−</button><span>${zoom}%</span><button data-zoom="10" aria-label="Zoom in">+</button></div>` : ""}</div><div class="row">${!essay ? `<button data-action="back" ${active.question === 0 ? "disabled" : ""}>← Back</button>` : ""}<button class="primary" data-action="next">${essay ? "Finish writing" : active.question === s.questions.length - 1 ? (reviewing ? "Results" : "Finish section") : "Next →"}</button></div></nav></div>`;
+  app.innerHTML = `<div class="test-shell"><header class="test-top"><div class="brand"><b>M</b>Mock Test <span class="sub">${esc(testName(test()))} · ${esc(s?.title || s?.label || "Writing")}</span></div><div class="row">${reviewing ? "<strong>Answer review</strong>" : `<span id="timer" class="timer"></span><button data-action="time">${hideTime ? "Show" : "Hide"} time</button>`}${focusButton()}</div></header><div class="toolbar"><h2>${essay ? "Writing" : `${esc(s.label)} · Question ${q.number} of ${s.questions.length}`}</h2><div class="row">${s?.calculator ? '<button data-action="calculator">Calculator</button>' : ""}<button data-action="scratch">Scratchpad</button>${!essay ? `<button data-action="flag" class="${active.flags[q.id] ? "marked" : ""}" aria-pressed="${!!active.flags[q.id]}">${active.flags[q.id] ? "★ Marked" : "☆ Mark"}</button><button data-action="review">Review</button>` : ""}<button data-action="help">Help</button></div></div><div class="workspace"><main class="question-pane">${essay ? essayHTML() : q.type === "sentence" ? `<div class="sentence-layout"><div class="passage">${q.sentences.map((x, i) => `<button class="sentence ${answerValue() === letters(q.count)[i] ? "selected" : ""}" data-choice="${letters(q.count)[i]}" aria-pressed="${answerValue() === letters(q.count)[i]}" ${reviewing ? "disabled" : ""}>${esc(x)}</button> `).join("")}</div><div class="sentence-prompt">${esc(q.prompt)}</div></div>` : q.text ? textQuestion(q) : `<div class="image-frame" style="width:${zoom}%"><img class="question-image" style="max-width:${(1100 * zoom) / 100}px" src="${q.image}" alt="Test ${active.test}, ${esc(s.label)}, question ${q.number}" draggable="false"></div>`}</main>${essay ? "" : `<aside class="answer-panel">${controls(q)}</aside>`}</div><nav class="bottom-nav"><div class="row">${reviewing ? '<button data-action="results">← Results</button>' : '<button data-action="leave">Save & exit</button>'}${!essay ? `<div class="zoom-controls"><button data-zoom="-10" aria-label="Zoom out">−</button><span>${zoom}%</span><button data-zoom="10" aria-label="Zoom in">+</button></div>` : ""}</div><div class="row">${!essay ? `<button data-action="back" ${active.question === 0 ? "disabled" : ""}>← Back</button>` : ""}<button class="primary" data-action="next">${essay ? "Finish writing" : active.question === s.questions.length - 1 ? (reviewing ? "Results" : "Finish section") : "Next →"}</button></div></nav></div>`;
   updateTimer();
   if (essay) {
     $("#essay").addEventListener("input", () => {
@@ -540,6 +559,7 @@ function updateTimer() {
   if (active.mode === "timed" && remaining <= 0) finishSection(true);
 }
 function renderResults() {
+  leaveFocusMode();
   closeModal();
   screen = "results";
   reviewing = false;
@@ -709,6 +729,64 @@ function exportData(one = false) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
+function focusButton() {
+  const label = document.fullscreenElement
+    ? "Exit focus mode"
+    : "Enter focus mode";
+  return `<button data-action="fullscreen" aria-label="${label}">${document.fullscreenElement ? "Exit focus" : "Focus mode"}</button>`;
+}
+function enterFocusMode() {
+  if (document.fullscreenElement) return;
+  if (!document.documentElement.requestFullscreen) {
+    notify("Full screen is unavailable in this browser.");
+    return;
+  }
+  // Called directly from Begin/Resume so browser user activation is retained.
+  document.documentElement
+    .requestFullscreen({ navigationUI: "hide" })
+    .then(() => {
+      focusOwned = true;
+      if (!["test", "between"].includes(screen)) leaveFocusMode();
+    })
+    .catch(() =>
+      notify(
+        "Full screen was blocked. Use the Focus mode button to try again.",
+      ),
+    );
+}
+function leaveFocusMode() {
+  if (!focusOwned) return;
+  focusOwned = false;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement) focusOwned = false;
+  const button = $('[data-action="fullscreen"]');
+  if (button) button.outerHTML = focusButton();
+});
+function settingsDialog() {
+  dialog(
+    `<form id="settings-form" class="settings-form"><h2>Settings</h2><label class="setting-row"><span>Full-screen focus mode</span><input id="setting-focus" type="checkbox" ${settings.focusMode ? "checked" : ""}></label><label class="setting-row"><span>Default test mode</span><select id="setting-mode"><option value="timed" ${settings.mode === "timed" ? "selected" : ""}>Timed</option><option value="practice" ${settings.mode === "practice" ? "selected" : ""}>Untimed</option></select></label><label class="setting-row"><span>Include writing by default</span><input id="setting-writing" type="checkbox" ${settings.includeWriting ? "checked" : ""}></label><label class="setting-row"><span>Show timer</span><input id="setting-timer" type="checkbox" ${settings.showTimer ? "checked" : ""}></label><label class="setting-row"><span>Show sidebar</span><input id="setting-sidebar" type="checkbox" ${!sidebarHidden ? "checked" : ""}></label><div class="dialog-actions"><button type="button" data-action="close">Cancel</button><button class="primary">Save</button></div></form>`,
+  );
+  $("#settings-form").onsubmit = (e) => {
+    e.preventDefault();
+    settings = C.preferences({
+      focusMode: $("#setting-focus").checked,
+      mode: $("#setting-mode").value,
+      includeWriting: $("#setting-writing").checked,
+      showTimer: $("#setting-timer").checked,
+    });
+    const hideSidebar = !$("#setting-sidebar").checked;
+    try {
+      localStorage.setItem("mock-test-settings", JSON.stringify(settings));
+    } catch (_) {
+      notify("Settings could not be saved in this browser.");
+    }
+    if (hideSidebar !== sidebarHidden) toggleLibrarySidebar();
+    closeModal();
+  };
+}
+
 function help() {
   dialog(
     '<h2>Using the test</h2><p>Select answers in the panel on the right. Unlabelled choices follow their order in the question: top to bottom, or left to right across each row. Multi-blank choices restart at A in each column.</p><p>Use Mark and Review to return to questions within the current section. Numeric entries accept equivalent decimals or fractions. Click directly on the passage for sentence-selection questions.</p><p>Timed sections keep counting if you leave or close the tab. Progress saves automatically. Results show accuracy against the supplied answer key.</p><div class="dialog-actions"><button class="primary" data-action="close">Got it</button></div>',
@@ -733,13 +811,16 @@ async function action(name) {
       hideTime = !hideTime;
       renderTest();
       break;
+    case "settings":
+      settingsDialog();
+      break;
     case "fullscreen":
-      try {
-        if (document.fullscreenElement) await document.exitFullscreen();
-        else await document.documentElement.requestFullscreen();
-      } catch (e) {
-        notify("Use your browser’s full-screen command.");
-      }
+      if (document.fullscreenElement) {
+        focusOwned = false;
+        document
+          .exitFullscreen()
+          .catch(() => notify("Use Esc to leave full screen."));
+      } else enterFocusMode();
       break;
     case "flag":
       if (!reviewing) {

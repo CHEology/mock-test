@@ -1293,3 +1293,63 @@ dialog h2 {
 .library-history .library-heading {
   flex-wrap: wrap;
 }
+
+.settings-form {
+  min-width: min(380px, 70vw);
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.setting-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--teal);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.setting-row select {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: white;
+}
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 42px;
+}
+.sidebar-heading .brand {
+  margin: 0;
+  font-size: 18px;
+}
+.sidebar-heading .brand b {
+  width: 30px;
+  height: 30px;
+  margin-right: 8px;
+  font-size: 18px;
+}
+.sidebar-heading .sidebar-toggle {
+  padding: 3px;
+}
+.sidebar-reopen {
+  display: inline-flex;
+}
+.sidebar-reopen[hidden] {
+  display: none;
+}
+@media (max-width: 720px) {
+  .sidebar-heading {
+    margin-bottom: 18px;
+  }
+  .library-sidebar .sidebar-heading .brand {
+    margin: 0;
+  }
+}

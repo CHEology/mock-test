@@ -55,7 +55,7 @@ function libraryShell(content, location) {
     (r) => r.kind === "category" && libVisible(r),
   );
   const toggle = `<button class="sidebar-toggle quiet" data-sidebar-toggle aria-label="${sidebarHidden ? "Show sidebar" : "Hide sidebar"}" aria-expanded="${!sidebarHidden}" aria-controls="library-sidebar" title="${sidebarHidden ? "Show sidebar" : "Hide sidebar"}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>`;
-  return `<div class="library-shell ${sidebarHidden ? "sidebar-hidden" : ""}"><aside class="library-sidebar" id="library-sidebar" ${sidebarHidden ? "hidden" : ""}><div class="brand"><b>M</b>Mock Test</div><nav aria-label="Library"><button class="side-link ${location === "all" && screen !== "history" ? "chosen" : ""}" data-lib-open="all">Library</button><div class="side-section"><span>Categories</span><button class="quiet icon-button" data-lib-new="category" aria-label="New category">+</button></div>${categories.map((r) => `<button class="side-link ${category?.id === r.id ? "chosen" : ""}" data-lib-open="${esc(r.id)}">${libIcon("category")}<span>${esc(r.name)}</span></button>`).join("")}<div class="side-bottom"><button class="side-link ${screen === "history" && historyGroup === "all" ? "chosen" : ""}" data-action="history">Attempts</button><button class="side-link ${location === "trash" ? "chosen" : ""}" data-lib-open="trash">Trash</button><button class="side-link" data-action="help">Help</button></div></nav></aside><main class="library-main ${screen === "history" ? "library-history" : ""}"><div class="library-topline">${toggle}<nav class="breadcrumbs" aria-label="Breadcrumb"><button data-lib-open="all">Library</button>${category ? `<span>/</span><button data-lib-open="${esc(category.id)}" ${current?.kind === "category" ? 'aria-current="page"' : ""}>${esc(category.name)}</button>` : ""}${current?.kind === "folder" ? `<span>/</span><button data-lib-open="${esc(current.id)}" aria-current="page">${esc(current.name)}</button>` : ""}${location === "trash" ? '<span>/</span><span aria-current="page">Trash</span>' : ""}</nav></div>${content}</main></div>`;
+  return `<div class="library-shell ${sidebarHidden ? "sidebar-hidden" : ""}"><aside class="library-sidebar" id="library-sidebar" ${sidebarHidden ? "hidden" : ""}><div class="sidebar-heading"><div class="brand"><b>M</b>Mock Test</div>${toggle}</div><nav aria-label="Library"><button class="side-link ${location === "all" && screen !== "history" ? "chosen" : ""}" data-lib-open="all">Library</button><div class="side-section"><span>Categories</span><button class="quiet icon-button" data-lib-new="category" aria-label="New category">+</button></div>${categories.map((r) => `<button class="side-link ${category?.id === r.id ? "chosen" : ""}" data-lib-open="${esc(r.id)}">${libIcon("category")}<span>${esc(r.name)}</span></button>`).join("")}<div class="side-bottom"><button class="side-link ${screen === "history" && historyGroup === "all" ? "chosen" : ""}" data-action="history">Attempts</button><button class="side-link ${location === "trash" ? "chosen" : ""}" data-lib-open="trash">Trash</button><button class="side-link" data-action="settings">Settings</button><button class="side-link" data-action="help">Help</button></div></nav></aside><main class="library-main ${screen === "history" ? "library-history" : ""}"><div class="library-topline"><span class="sidebar-reopen" ${sidebarHidden ? "" : "hidden"}>${toggle}</span><nav class="breadcrumbs" aria-label="Breadcrumb"><button data-lib-open="all">Library</button>${category ? `<span>/</span><button data-lib-open="${esc(category.id)}" ${current?.kind === "category" ? 'aria-current="page"' : ""}>${esc(category.name)}</button>` : ""}${current?.kind === "folder" ? `<span>/</span><button data-lib-open="${esc(current.id)}" aria-current="page">${esc(current.name)}</button>` : ""}${location === "trash" ? '<span>/</span><span aria-current="page">Trash</span>' : ""}</nav></div>${content}</main></div>`;
 }
 function libraryTabs(location, attempts = false) {
   const current = libItem(location);
@@ -69,13 +69,15 @@ function toggleLibrarySidebar() {
   } catch (_) {}
   $(".library-shell").classList.toggle("sidebar-hidden", sidebarHidden);
   $("#library-sidebar").hidden = sidebarHidden;
-  const button = $("[data-sidebar-toggle]");
-  button.setAttribute("aria-expanded", String(!sidebarHidden));
-  button.setAttribute(
-    "aria-label",
-    sidebarHidden ? "Show sidebar" : "Hide sidebar",
-  );
-  button.title = sidebarHidden ? "Show sidebar" : "Hide sidebar";
+  document.querySelectorAll("[data-sidebar-toggle]").forEach((button) => {
+    button.setAttribute("aria-expanded", String(!sidebarHidden));
+    button.setAttribute(
+      "aria-label",
+      sidebarHidden ? "Show sidebar" : "Hide sidebar",
+    );
+    button.title = sidebarHidden ? "Show sidebar" : "Hide sidebar";
+  });
+  $(".sidebar-reopen").hidden = !sidebarHidden;
 }
 
 function renderLibrary() {

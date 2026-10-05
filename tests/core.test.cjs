@@ -66,21 +66,79 @@ test("demo includes every answer type with valid answer keys", () => {
   }
 });
 
-test('deleted attempt IDs cannot return from a stale tab, even with a later timestamp', () => {
+test("deleted attempt IDs cannot return from a stale tab, even with a later timestamp", () => {
   const merged = C.mergeState(
-    {version:1, updated:100, attempts:[], deleted:{old:100}},
-    {version:1, updated:200, attempts:[{id:'old', updated:200, answers:{q:'A'}},{id:'new', updated:200}]},
+    { version: 1, updated: 100, attempts: [], deleted: { old: 100 } },
+    {
+      version: 1,
+      updated: 200,
+      attempts: [
+        { id: "old", updated: 200, answers: { q: "A" } },
+        { id: "new", updated: 200 },
+      ],
+    },
   );
-  assert.deepEqual(merged.attempts.map(a=>a.id), ['new']);
-  assert.equal(merged.deleted.old,100);
+  assert.deepEqual(
+    merged.attempts.map((a) => a.id),
+    ["new"],
+  );
+  assert.equal(merged.deleted.old, 100);
 });
 
-test('state merging keeps independent attempts and the newest revision', () => {
-  const merged=C.mergeState(
-    {version:1, updated:20, attempts:[{id:'a',updated:20,answers:{q:'B'}}],deleted:{x:10}},
-    {version:1, updated:30, attempts:[{id:'a',updated:10,answers:{}},{id:'b',updated:30}],deleted:{y:30}},
+test("state merging keeps independent attempts and the newest revision", () => {
+  const merged = C.mergeState(
+    {
+      version: 1,
+      updated: 20,
+      attempts: [{ id: "a", updated: 20, answers: { q: "B" } }],
+      deleted: { x: 10 },
+    },
+    {
+      version: 1,
+      updated: 30,
+      attempts: [
+        { id: "a", updated: 10, answers: {} },
+        { id: "b", updated: 30 },
+      ],
+      deleted: { y: 30 },
+    },
   );
-  assert.deepEqual(merged.attempts.find(a=>a.id==='a').answers,{q:'B'});
-  assert.equal(merged.attempts.length,2);
-  assert.deepEqual(Object.keys(merged.deleted).sort(),['x','y']);
+  assert.deepEqual(merged.attempts.find((a) => a.id === "a").answers, {
+    q: "B",
+  });
+  assert.equal(merged.attempts.length, 2);
+  assert.deepEqual(Object.keys(merged.deleted).sort(), ["x", "y"]);
+});
+
+test("test preferences default to focus mode and preserve explicit opt-outs", () => {
+  assert.deepEqual(C.preferences(), {
+    focusMode: true,
+    mode: "timed",
+    includeWriting: true,
+    showTimer: true,
+  });
+  assert.deepEqual(
+    C.preferences({
+      focusMode: false,
+      mode: "practice",
+      includeWriting: false,
+      showTimer: false,
+    }),
+    {
+      focusMode: false,
+      mode: "practice",
+      includeWriting: false,
+      showTimer: false,
+    },
+  );
+  assert.deepEqual(
+    C.preferences({
+      focusMode: "false",
+      mode: "invalid",
+      includeWriting: null,
+      showTimer: 0,
+    }),
+    C.preferences(),
+  );
+  assert.deepEqual(C.preferences(null), C.preferences());
 });

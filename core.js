@@ -131,7 +131,18 @@
         .sort((a, b) => (a.created || 0) - (b.created || 0)),
     };
   }
+  function preferences(value = {}) {
+    if (!value || typeof value !== "object") value = {};
+    return {
+      focusMode: typeof value.focusMode === "boolean" ? value.focusMode : true,
+      mode: value.mode === "practice" ? "practice" : "timed",
+      includeWriting:
+        typeof value.includeWriting === "boolean" ? value.includeWriting : true,
+      showTimer: typeof value.showTimer === "boolean" ? value.showTimer : true,
+    };
+  }
   root.MockTestCore = {
+    preferences,
     numeric,
     answered,
     grade,

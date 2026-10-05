@@ -5,6 +5,7 @@ A general-purpose mock-test interface that runs locally in your browser. Plain J
 - Two-level library: categories and folders, with scoped attempt tabs and a collapsible sidebar
 - Search, move, rename, and recoverable Trash
 - Writing-task creation, section-specific practice copies, and JSON import/export
+- Full-screen focus mode by default, with a per-test opt-out and saved Settings
 - Configurable sections, timing, and optional writing tasks
 - Single/multiple choice, multi-blank, numeric, fraction, and sentence-selection answers
 - Mark and review, calculator, and typed/drawn scratchpad
@@ -19,6 +20,8 @@ python3 launch.py
 ```
 
 This starts the local server and opens **http://127.0.0.1:17654** in Chrome on macOS when installed, or your default browser otherwise. Use `MOCK_TEST_PORT=17655 python3 launch.py` to choose another port. To run in the foreground instead, use `python3 server.py`.
+
+Settings controls default focus mode, timed/untimed mode, writing, timer visibility, and the sidebar. Focus mode uses the browser’s Fullscreen API: Esc or **Exit focus** returns to the normal window, and finishing or leaving a test exits automatically. Browser permission restrictions may prevent automatic full screen; the test still starts. Preferences are saved in this browser.
 
 ## Add your questions
 
