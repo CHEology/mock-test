@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import plistlib
+import sys
 import unittest
 
 SPEC = importlib.util.spec_from_file_location('app_sync', Path(__file__).resolve().parents[1] / 'sync.py')
@@ -16,6 +18,7 @@ class SyncTests(unittest.TestCase):
             for name in sync.SHARED:
                 (sync.ROOT / name).write_text('new shared file')
             (sync.ROOT / 'data.js').write_text('private questions')
+            (sync.ROOT / 'icon.icns').write_bytes(b'example icon')
             (sync.ROOT / 'assets').mkdir()
             (sync.ROOT / 'assets' / '01.webp').write_bytes(b'question image')
             destination = Path(tmp) / 'installed'
@@ -27,3 +30,10 @@ class SyncTests(unittest.TestCase):
                 self.assertEqual((destination / name).read_bytes(), (sync.ROOT / name).read_bytes())
             self.assertEqual((destination / 'data.js').read_text(), 'private questions')
             self.assertEqual(saved.read_text(), '{"existing": "answers"}')
+
+            if sys.platform == 'darwin':
+                contents = destination / 'Mock Test.app' / 'Contents'
+                with (contents / 'Info.plist').open('rb') as stream:
+                    info = plistlib.load(stream)
+                self.assertEqual(info['CFBundleIconFile'], 'MockTest.icns')
+                self.assertEqual((contents / 'Resources' / info['CFBundleIconFile']).read_bytes(), b'example icon')

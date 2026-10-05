@@ -26,13 +26,16 @@ def sync(destination):
     if sys.platform == 'darwin':
         contents = destination / 'Mock Test.app' / 'Contents'
         (contents / 'MacOS').mkdir(parents=True, exist_ok=True)
+        (contents / 'Resources').mkdir(exist_ok=True)
+        shutil.copy2(ROOT / 'icon.icns', contents / 'Resources' / 'MockTest.icns')
         with (contents / 'Info.plist').open('wb') as stream:
             plistlib.dump({
                 'CFBundleExecutable': 'launch',
                 'CFBundleIdentifier': 'local.mocktest.app',
                 'CFBundleName': 'Mock Test',
+                'CFBundleIconFile': 'MockTest.icns',
                 'CFBundlePackageType': 'APPL',
-                'CFBundleVersion': '1',
+                'CFBundleVersion': '1.0.1',
                 'LSUIElement': True,
             }, stream)
         executable = contents / 'MacOS' / 'launch'
