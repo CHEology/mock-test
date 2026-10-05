@@ -1,0 +1,166 @@
+// Original, abbreviated examples covering the supported answer controls.
+window.MOCK_TEST_DEMO = true;
+window.MOCK_TEST_DATA = [
+  {
+    id: 9001,
+    essayMinutes: 10,
+    essay:
+      "A useful education should teach people how to revise their beliefs. Write a response explaining the extent to which you agree or disagree. Support your position with reasons and examples.",
+    sections: [
+      {
+        id: 2,
+        label: "Reading 1",
+        title: "Reading and vocabulary",
+        minutes: 5,
+        questions: [
+          {
+            id: "demo.v1.1",
+            number: 1,
+            type: "single",
+            count: 5,
+            key: "B",
+            text: "Although the report was brief, it was remarkably _____: it addressed every issue raised by the committee.",
+            labels: [
+              "evasive",
+              "comprehensive",
+              "speculative",
+              "repetitive",
+              "ambiguous",
+            ],
+          },
+          {
+            id: "demo.v1.2",
+            number: 2,
+            type: "blanks",
+            count: 2,
+            key: "BA",
+            text: "The researcher remained (i) _____ about the result until independent experiments provided (ii) _____ evidence.",
+            options: [
+              ["certain", "skeptical", "indifferent"],
+              ["corroborating", "irrelevant", "contradictory"],
+            ],
+          },
+          {
+            id: "demo.v1.3",
+            number: 3,
+            type: "multi",
+            count: 6,
+            limit: 2,
+            key: "AE",
+            text: "The instructions were so _____ that even a first-time visitor could follow them without help.",
+            labels: [
+              "clear",
+              "verbose",
+              "tentative",
+              "cryptic",
+              "lucid",
+              "ornate",
+            ],
+          },
+        ],
+      },
+      {
+        id: 3,
+        label: "Math 1",
+        title: "Arithmetic",
+        calculator: true,
+        minutes: 5,
+        questions: [
+          {
+            id: "demo.q1.1",
+            number: 1,
+            type: "single",
+            count: 4,
+            key: "A",
+            text: "Quantity A: 3² + 4²\nQuantity B: 24",
+            labels: [
+              "Quantity A is greater.",
+              "Quantity B is greater.",
+              "The quantities are equal.",
+              "The relationship cannot be determined.",
+            ],
+          },
+          {
+            id: "demo.q1.2",
+            number: 2,
+            type: "numeric",
+            count: 1,
+            key: "42",
+            text: "What is 15 percent of 280?",
+          },
+          {
+            id: "demo.q1.3",
+            number: 3,
+            type: "fraction",
+            count: 2,
+            key: "2/5",
+            text: "A bag contains 4 red counters and 6 blue counters. If one counter is selected at random, what is the probability that it is red? Enter a fraction.",
+          },
+        ],
+      },
+      {
+        id: 4,
+        label: "Reading 2",
+        title: "Reading and reasoning",
+        minutes: 5,
+        questions: [
+          {
+            id: "demo.v2.1",
+            number: 1,
+            type: "sentence",
+            count: 3,
+            key: "B",
+            prompt:
+              "Select the sentence that gives evidence of a benefit of tree cover.",
+            sentences: [
+              "City planners often plant trees to improve the appearance of streets.",
+              "Measurements on summer afternoons show that shaded pavements can be cooler than nearby unshaded pavements.",
+              "The effect varies with tree species, weather, and street layout.",
+            ],
+          },
+          {
+            id: "demo.v2.2",
+            number: 2,
+            type: "single",
+            count: 5,
+            key: "C",
+            text: "A library extended its opening hours, after which evening visits increased. Its director concluded that the longer hours alone caused the increase. Which finding most weakens that conclusion?",
+            labels: [
+              "The library kept its existing furniture.",
+              "Morning visits remained unchanged.",
+              "A nearby library closed during the same period.",
+              "The director announced the hours online.",
+              "The library has a large collection.",
+            ],
+          },
+        ],
+      },
+      {
+        id: 5,
+        label: "Math 2",
+        title: "Applied math",
+        calculator: true,
+        minutes: 5,
+        questions: [
+          {
+            id: "demo.q2.1",
+            number: 1,
+            type: "multi",
+            count: 5,
+            key: "ACD",
+            text: "Which of the following integers are divisible by 6? Select all that apply.",
+            labels: ["12", "16", "18", "24", "28"],
+          },
+          {
+            id: "demo.q2.2",
+            number: 2,
+            type: "numeric",
+            count: 1,
+            key: "3.5",
+            text: "The mean of four numbers is 5. The first three numbers sum to 16.5. What is the fourth number?",
+          },
+        ],
+      },
+    ],
+  },
+];

@@ -1,0 +1,15 @@
+# Local question bank and attempts
+/data.js
+/assets/
+/.progress/
+/Mock-Test-progress*.json
+/Mock-Test-*-attempt.json
+
+# Machine-specific launcher and generated files
+*.app/
+__pycache__/
+*.py[cod]
+.DS_Store
+node_modules/
+
+/local-config.json
