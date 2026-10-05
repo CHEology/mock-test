@@ -102,10 +102,16 @@
   }
   function mergeState(...states) {
     const deleted = Object.create(null),
-      attempts = new Map();
+      attempts = new Map(),
+      library = new Map();
     let updated = 0;
     for (const state of states.filter(Boolean)) {
       updated = Math.max(updated, state.updated || 0);
+      for (const item of state.library || []) {
+        const old = library.get(item.id);
+        if (!old || item.updated >= old.updated)
+          library.set(item.id, { ...item });
+      }
       for (const [id, time] of Object.entries(state.deleted || {}))
         deleted[id] = Math.max(deleted[id] || 0, time);
       for (const attempt of state.attempts || []) {
@@ -119,6 +125,7 @@
       version: 1,
       updated,
       deleted,
+      library: [...library.values()],
       attempts: [...attempts.values()]
         .filter((a) => !Object.hasOwn(deleted, a.id))
         .sort((a, b) => (a.created || 0) - (b.created || 0)),

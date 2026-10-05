@@ -92,3 +92,22 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(error.exception.code,400)
         saved=json.loads(self.request('/api/state'))
         self.assertEqual(saved['attempts'][0]['answers'],{'q':'B'})
+
+    def test_library_merges_without_changing_attempts(self):
+        base = {'id':'folder','kind':'folder','name':'Full tests','parent':'category','updated':10,'trashed':False}
+        self.request('/api/state', {'version':1,'attempts':[{'id':'answer','answers':{'q':'A'}}],'library':[base]})
+        self.request('/api/state', {'version':1,'attempts':[],'library':[dict(base,name='Writing',updated=20,trashed=True)]})
+        self.request('/api/state', {'version':1,'attempts':[],'library':[base]})
+        self.request('/api/state', {'version':1,'attempts':[]})
+        saved=json.loads(self.request('/api/state'))
+        self.assertEqual(saved['library'][0]['name'],'Writing')
+        self.assertTrue(saved['library'][0]['trashed'])
+        self.assertEqual(saved['attempts'][0]['answers'],{'q':'A'})
+
+    def test_invalid_library_does_not_replace_saved_state(self):
+        state={'version':1,'attempts':[],'library':[{'id':'cat','kind':'category','name':'Practice','updated':1}]}
+        self.request('/api/state',state)
+        for records in [{},[{'id':'bad','kind':'unknown','name':'X'}],[{'id':'bad','kind':'category','name':'X','updated':float('nan')}]]:
+            with self.assertRaises(urllib.error.HTTPError):
+                self.request('/api/state',dict(state,library=records))
+        self.assertEqual(json.loads(self.request('/api/state'))['library'],state['library'])

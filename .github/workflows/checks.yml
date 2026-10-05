@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: node --test tests/core.test.cjs
+      - run: node --test tests/*.test.cjs
       - run: python -m unittest discover -s tests
   macos-launcher:
     runs-on: macos-latest

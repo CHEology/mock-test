@@ -22,11 +22,24 @@ def timestamp(value):
 
 
 def merge_state(existing, incoming):
-    deleted, attempts = {}, {}
+    deleted, attempts, library = {}, {}, {}
     for state in (existing, incoming):
         if not isinstance(state, dict) or state.get('version') != 1 or not isinstance(state.get('attempts'), list):
             raise ValueError('Invalid state')
         timestamp(state.get('updated', 0))
+        records = state.get('library', [])
+        if not isinstance(records, list):
+            raise ValueError('Invalid library')
+        for item in records:
+            if (not isinstance(item, dict) or not isinstance(item.get('id'), str)
+                    or item.get('kind') not in ('category', 'folder', 'test')
+                    or not isinstance(item.get('name'), str)
+                    or not isinstance(item.get('trashed', False), bool)):
+                raise ValueError('Invalid library item')
+            timestamp(item.get('updated', 0))
+            old = library.get(item['id'])
+            if old is None or item.get('updated', 0) >= old.get('updated', 0):
+                library[item['id']] = item
         removals = state.get('deleted', {})
         if not isinstance(removals, dict):
             raise ValueError('Invalid deletions')
@@ -47,6 +60,7 @@ def merge_state(existing, incoming):
         'version': 1,
         'updated': max(existing.get('updated', 0), incoming.get('updated', 0)),
         'deleted': deleted,
+        'library': list(library.values()),
         'attempts': sorted((a for identity, a in attempts.items() if identity not in deleted), key=lambda a: a.get('created', 0)),
     }
 
@@ -90,7 +104,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/data.js' and not (ROOT / 'data.js').exists():
             self.path = '/data.demo.js'
             return super().do_GET()
-        if path not in ['/', '/index.html', '/app.js', '/core.js', '/data.js', '/style.css', '/icon.svg'] and not (path.startswith('/assets/') and path.endswith('.webp') and '..' not in path):
+        if path not in ['/', '/index.html', '/app.js', '/core.js', '/library.js', '/library-ui.js', '/data.js', '/style.css', '/icon.svg'] and not (path.startswith('/assets/') and path.endswith('.webp') and '..' not in path):
             return self.send_error(404)
         return super().do_GET()
 

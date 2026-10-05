@@ -1,6 +1,7 @@
 "use strict";
-const DATA = window.MOCK_TEST_DATA,
-  C = window.MockTestCore,
+const BASE_DATA = window.MOCK_TEST_DATA;
+let DATA = [...BASE_DATA];
+const C = window.MockTestCore,
   $ = (s) => document.querySelector(s),
   app = $("#app"),
   modal = $("#modal");
@@ -99,11 +100,15 @@ async function init() {
     (x) => x?.version === 1 && Array.isArray(x.attempts),
   );
   db = C.mergeState(...candidates);
+  const oldLibrary = JSON.stringify(db.library);
+  syncLibrary();
   renderHome();
+  if (oldLibrary !== JSON.stringify(db.library)) save(false);
 }
 function acceptState(state, persist = true) {
   const previous = active;
   db = C.mergeState(db, state);
+  syncLibrary();
   if (previous) active = db.attempts.find((a) => a.id === previous.id) || null;
   if (persist) {
     try {
@@ -114,7 +119,12 @@ function acceptState(state, persist = true) {
     closeModal();
     renderHome();
     notify("This attempt was cleared.");
-  } else if (screen === "home") renderHome();
+  } else if (
+    screen === "home" &&
+    !modal.open &&
+    document.activeElement?.id !== "library-search"
+  )
+    renderHome();
   else if (screen === "history" && !modal.open) renderHistory();
   else if (active && active.updated > (previous?.updated || 0)) {
     closeModal();
@@ -143,13 +153,19 @@ function homeButton() {
   return '<button data-action="home">← Test library</button>';
 }
 function testName(t) {
-  return t.title || `Test ${String(t.id).padStart(2, "0")}`;
+  return (
+    db.library?.find((r) => r.kind === "test" && r.testId === t.id)?.name ||
+    t.title ||
+    `Test ${String(t.id).padStart(2, "0")}`
+  );
 }
 function attemptScore(a) {
   const t = DATA.find((t) => t.id === a.test);
   const questions = t.sections
     .flatMap((s) => s.questions)
     .filter((q) => !q.disputed);
+  if (!questions.length)
+    return t.sections.length ? "Unscored" : "Writing saved";
   return `${questions.filter((q) => C.grade(q, a.answers[q.id])).length} / ${questions.length}`;
 }
 function attemptStatus(a) {
@@ -167,14 +183,7 @@ function renderHome() {
   reviewing = false;
   closeTools();
   document.title = "Mock Test";
-  app.innerHTML = `<main class="home"><header class="row spread"><div class="brand"><b>M</b>Mock Test</div><div class="row"><button data-action="history">Attempts</button><button data-action="help" class="quiet">Help</button></div></header><div class="test-list">${DATA.map(
-    (t) => {
-      const attempts = db.attempts.filter((a) => a.test === t.id);
-      const open = attempts.findLast((a) => a.status !== "done");
-      const last = attempts.findLast((a) => a.status === "done");
-      return `<article class="test-row"><div class="test-identity"><h2>${esc(testName(t))}</h2>${open ? `<span class="muted">${esc(attemptStatus(open))}</span>` : last ? `<span class="muted">Latest ${attemptScore(last)}</span>` : ""}</div><div class="row">${attempts.length ? `<button class="quiet" data-history="${t.id}">${attempts.length} ${attempts.length === 1 ? "attempt" : "attempts"}</button>` : ""}${open ? `<button class="primary" data-resume="${open.id}">Resume</button>` : `<button class="primary" data-start="${t.id}">${last ? "Try again" : "Start"}</button>`}</div></article>`;
-    },
-  ).join("")}</div></main>`;
+  renderLibrary();
 }
 function historyAttempts() {
   return db.attempts
@@ -252,7 +261,7 @@ async function deleteAttempts() {
 function startDialog(id) {
   const t = DATA.find((x) => x.id === id);
   dialog(
-    `<h2>Start Test ${String(id).padStart(2, "0")}</h2><label class="radio-card"><input type="radio" name="mode" value="timed" checked><span><strong>Timed test</strong><br>Each section ends when time runs out.</span></label><label class="radio-card"><input type="radio" name="mode" value="practice"><span><strong>Untimed practice</strong><br>Work at your own pace.</span></label>${t.essay ? `<label class="radio-card"><input id="include-essay" type="checkbox" checked><span>Include writing · ${t.essayMinutes ?? 30} minutes</span></label>` : ""}<div class="section-track">${t.sections.map((s) => `<span>${s.label} · ${s.questions.length} questions · ${s.minutes}m</span>`).join("")}</div><div class="dialog-actions"><button data-action="close">Cancel</button><button class="primary" data-begin="${id}">Begin</button></div>`,
+    `<h2>Start ${esc(testName(t))}</h2><label class="radio-card"><input type="radio" name="mode" value="timed" checked><span><strong>Timed test</strong><br>Each section ends when time runs out.</span></label><label class="radio-card"><input type="radio" name="mode" value="practice"><span><strong>Untimed practice</strong><br>Work at your own pace.</span></label>${t.essay ? `<label class="radio-card"><input id="include-essay" type="checkbox" checked ${!t.sections.length ? "disabled" : ""}><span>Include writing · ${t.essayMinutes ?? 30} minutes</span></label>` : ""}<div class="section-track">${t.sections.map((s) => `<span>${esc(s.label)} · ${s.questions.length} questions · ${s.minutes}m</span>`).join("")}</div><div class="dialog-actions"><button data-action="close">Cancel</button><button class="primary" data-begin="${id}">Begin</button></div>`,
   );
 }
 function begin(id) {
@@ -373,8 +382,8 @@ function renderTest() {
   const s = section(),
     q = question(),
     essay = !s;
-  document.title = `Test ${active.test} · ${s?.label || "Writing"} | Mock Test`;
-  app.innerHTML = `<div class="test-shell"><header class="test-top"><div class="brand"><b>M</b>Mock Test <span class="sub">Test ${String(active.test).padStart(2, "0")} · ${esc(s?.title || s?.label || "Writing")}</span></div><div class="row">${reviewing ? "<strong>Answer review</strong>" : `<span id="timer" class="timer"></span><button data-action="time">${hideTime ? "Show" : "Hide"} time</button>`}<button data-action="fullscreen" aria-label="Toggle full screen">Full screen</button></div></header><div class="toolbar"><h2>${essay ? "Writing" : `${s.label} · Question ${q.number} of ${s.questions.length}`}</h2><div class="row">${s?.calculator ? '<button data-action="calculator">Calculator</button>' : ""}<button data-action="scratch">Scratchpad</button>${!essay ? `<button data-action="flag" class="${active.flags[q.id] ? "marked" : ""}" aria-pressed="${!!active.flags[q.id]}">${active.flags[q.id] ? "★ Marked" : "☆ Mark"}</button><button data-action="review">Review</button>` : ""}<button data-action="help">Help</button></div></div><div class="workspace"><main class="question-pane">${essay ? essayHTML() : q.type === "sentence" ? `<div class="sentence-layout"><div class="passage">${q.sentences.map((x, i) => `<button class="sentence ${answerValue() === letters(q.count)[i] ? "selected" : ""}" data-choice="${letters(q.count)[i]}" aria-pressed="${answerValue() === letters(q.count)[i]}" ${reviewing ? "disabled" : ""}>${esc(x)}</button> `).join("")}</div><div class="sentence-prompt">${esc(q.prompt)}</div></div>` : q.text ? textQuestion(q) : `<div class="image-frame" style="width:${zoom}%"><img class="question-image" style="max-width:${(1100 * zoom) / 100}px" src="${q.image}" alt="Test ${active.test}, ${s.label}, question ${q.number}" draggable="false"></div>`}</main>${essay ? "" : `<aside class="answer-panel">${controls(q)}</aside>`}</div><nav class="bottom-nav"><div class="row">${reviewing ? '<button data-action="results">← Results</button>' : '<button data-action="leave">Save & exit</button>'}${!essay ? `<div class="zoom-controls"><button data-zoom="-10" aria-label="Zoom out">−</button><span>${zoom}%</span><button data-zoom="10" aria-label="Zoom in">+</button></div>` : ""}</div><div class="row">${!essay ? `<button data-action="back" ${active.question === 0 ? "disabled" : ""}>← Back</button>` : ""}<button class="primary" data-action="next">${essay ? "Finish writing" : active.question === s.questions.length - 1 ? (reviewing ? "Results" : "Finish section") : "Next →"}</button></div></nav></div>`;
+  document.title = `${testName(test())} · ${s?.label || "Writing"} | Mock Test`;
+  app.innerHTML = `<div class="test-shell"><header class="test-top"><div class="brand"><b>M</b>Mock Test <span class="sub">${esc(testName(test()))} · ${esc(s?.title || s?.label || "Writing")}</span></div><div class="row">${reviewing ? "<strong>Answer review</strong>" : `<span id="timer" class="timer"></span><button data-action="time">${hideTime ? "Show" : "Hide"} time</button>`}<button data-action="fullscreen" aria-label="Toggle full screen">Full screen</button></div></header><div class="toolbar"><h2>${essay ? "Writing" : `${esc(s.label)} · Question ${q.number} of ${s.questions.length}`}</h2><div class="row">${s?.calculator ? '<button data-action="calculator">Calculator</button>' : ""}<button data-action="scratch">Scratchpad</button>${!essay ? `<button data-action="flag" class="${active.flags[q.id] ? "marked" : ""}" aria-pressed="${!!active.flags[q.id]}">${active.flags[q.id] ? "★ Marked" : "☆ Mark"}</button><button data-action="review">Review</button>` : ""}<button data-action="help">Help</button></div></div><div class="workspace"><main class="question-pane">${essay ? essayHTML() : q.type === "sentence" ? `<div class="sentence-layout"><div class="passage">${q.sentences.map((x, i) => `<button class="sentence ${answerValue() === letters(q.count)[i] ? "selected" : ""}" data-choice="${letters(q.count)[i]}" aria-pressed="${answerValue() === letters(q.count)[i]}" ${reviewing ? "disabled" : ""}>${esc(x)}</button> `).join("")}</div><div class="sentence-prompt">${esc(q.prompt)}</div></div>` : q.text ? textQuestion(q) : `<div class="image-frame" style="width:${zoom}%"><img class="question-image" style="max-width:${(1100 * zoom) / 100}px" src="${q.image}" alt="Test ${active.test}, ${esc(s.label)}, question ${q.number}" draggable="false"></div>`}</main>${essay ? "" : `<aside class="answer-panel">${controls(q)}</aside>`}</div><nav class="bottom-nav"><div class="row">${reviewing ? '<button data-action="results">← Results</button>' : '<button data-action="leave">Save & exit</button>'}${!essay ? `<div class="zoom-controls"><button data-zoom="-10" aria-label="Zoom out">−</button><span>${zoom}%</span><button data-zoom="10" aria-label="Zoom in">+</button></div>` : ""}</div><div class="row">${!essay ? `<button data-action="back" ${active.question === 0 ? "disabled" : ""}>← Back</button>` : ""}<button class="primary" data-action="next">${essay ? "Finish writing" : active.question === s.questions.length - 1 ? (reviewing ? "Results" : "Finish section") : "Next →"}</button></div></nav></div>`;
   updateTimer();
   if (essay) {
     $("#essay").addEventListener("input", () => {
@@ -443,7 +452,7 @@ function refreshControls() {
 function reviewDialog() {
   const s = section();
   dialog(
-    `<h2>${s.label} · Review section</h2><div class="review-grid">${s.questions
+    `<h2>${esc(s.label)} · Review section</h2><div class="review-grid">${s.questions
       .map((q, i) => {
         const yes = C.answered(q, active.answers[q.id]),
           flag = active.flags[q.id];
@@ -460,7 +469,7 @@ function finishDialog() {
       ? s.questions.filter((q) => !C.answered(q, active.answers[q.id])).length
       : 0;
   dialog(
-    `<h2>${s ? "Finish " + s.label + "?" : "Finish writing?"}</h2><p>${missing ? `${missing} question${missing > 1 ? "s are" : " is"} unanswered. ` : ""}You cannot return to this section after finishing.</p><div class="dialog-actions"><button data-action="close">Keep working</button><button class="primary" data-action="confirm-finish">Finish section</button></div>`,
+    `<h2>${s ? "Finish " + esc(s.label) + "?" : "Finish writing?"}</h2><p>${missing ? `${missing} question${missing > 1 ? "s are" : " is"} unanswered. ` : ""}You cannot return to this section after finishing.</p><div class="dialog-actions"><button data-action="close">Keep working</button><button class="primary" data-action="confirm-finish">Finish section</button></div>`,
   );
 }
 function finishSection(expired = false) {
@@ -486,7 +495,7 @@ function finishSection(expired = false) {
 function renderBetween() {
   screen = "between";
   const s = section();
-  app.innerHTML = `<main class="center-screen"><div class="eyebrow">Test ${String(active.test).padStart(2, "0")}</div><h1 style="margin-top:22px">${active.expired ? "Time is up." : "Section complete."}</h1><p>Your answers have been saved.</p><div class="card" style="margin:32px 0"><h2>Next: ${esc(s.title || s.label)}</h2><div class="section-track"><span>${s.questions.length} questions</span><span>${active.mode === "timed" ? s.minutes + " minutes" : "Untimed"}</span></div></div><div class="row spread">${homeButton()}<button class="primary" data-action="next-section">Start ${s.label}</button></div></main>`;
+  app.innerHTML = `<main class="center-screen"><div class="eyebrow">${esc(testName(test()))}</div><h1 style="margin-top:22px">${active.expired ? "Time is up." : "Section complete."}</h1><p>Your answers have been saved.</p><div class="card" style="margin:32px 0"><h2>Next: ${esc(s.title || s.label)}</h2><div class="section-track"><span>${s.questions.length} questions</span><span>${active.mode === "timed" ? s.minutes + " minutes" : "Untimed"}</span></div></div><div class="row spread">${homeButton()}<button class="primary" data-action="next-section">Start ${esc(s.label)}</button></div></main>`;
 }
 function updateTimer() {
   if (screen !== "test" || reviewing || !active) return;
@@ -506,7 +515,7 @@ function renderResults() {
   reviewing = false;
   closeTools();
   const t = test();
-  document.title = `Test ${t.id} results | Mock Test`;
+  document.title = `${testName(t)} results | Mock Test`;
   let total = 0,
     correct = 0,
     excluded = 0;
@@ -520,10 +529,10 @@ function renderResults() {
       return `<div class="score-card"><span>${esc(s.title || s.label)}</span><strong>${right} <span class="muted" style="font-size:21px">/ ${scored.length}</span></strong><span class="muted">${formatTime(active.times[t.sections.indexOf(s)] || 0)}</span></div>`;
     })
     .join("");
-  app.innerHTML = `<main class="results"><div class="row spread"><button data-action="results-history">← Attempts</button><div class="row"><button data-action="export-attempt">Export</button><button class="danger quiet" data-action="delete-current">Delete result</button></div></div><div style="margin-top:40px"><div class="eyebrow">Test ${String(t.id).padStart(2, "0")} · ${active.mode === "timed" ? "Timed" : "Untimed"}</div><h1 style="margin-top:16px">${correct} of ${total} correct</h1>${excluded ? `<p class="muted">${excluded} disputed question${excluded > 1 ? "s" : ""} excluded from scoring.</p>` : ""}</div><div class="results-summary">${cards}</div><div class="row spread"><h2 style="margin:0">Review your answers</h2>${active.includeEssay ? '<button data-action="review-essay">Read your essay</button>' : ""}</div>${t.sections
+  app.innerHTML = `<main class="results"><div class="row spread"><button data-action="results-history">← Attempts</button><div class="row"><button data-action="export-attempt">Export</button><button class="danger quiet" data-action="delete-current">Delete result</button></div></div><div style="margin-top:40px"><div class="eyebrow">${esc(testName(t))} · ${active.mode === "timed" ? "Timed" : "Untimed"}</div><h1 style="margin-top:16px">${total ? `${correct} of ${total} correct` : t.sections.length ? "No scored questions" : "Writing complete"}</h1>${excluded ? `<p class="muted">${excluded} disputed question${excluded > 1 ? "s" : ""} excluded from scoring.</p>` : ""}</div><div class="results-summary">${cards}</div><div class="row spread"><h2 style="margin:0">${t.sections.length ? "Review your answers" : "Your writing"}</h2>${active.includeEssay ? '<button data-action="review-essay">Read your essay</button>' : ""}</div>${t.sections
     .map(
       (s, si) =>
-        `<h3 style="margin-top:32px">${s.label}</h3><table><thead><tr><th>Question</th><th>Your answer</th><th>Key</th><th>Result</th></tr></thead><tbody>${s.questions
+        `<h3 style="margin-top:32px">${esc(s.label)}</h3><table><thead><tr><th>Question</th><th>Your answer</th><th>Key</th><th>Result</th></tr></thead><tbody>${s.questions
           .map((q, qi) => {
             const g = C.grade(q, active.answers[q.id]);
             return `<tr tabindex="0" data-review="${si},${qi}"><td>${q.number}${active.flags[q.id] ? " ★" : ""}</td><td>${esc(C.display(q, active.answers[q.id]))}</td><td>${esc(q.key)}</td><td class="${g === null ? "tag-dispute" : g ? "tag-correct" : "tag-incorrect"}">${g === null ? "Disputed" : g ? "Correct" : C.answered(q, active.answers[q.id]) ? "Incorrect" : "Unanswered"} →</td></tr>`;

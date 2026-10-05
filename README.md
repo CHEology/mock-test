@@ -2,6 +2,8 @@
 
 A general-purpose mock-test interface that runs locally in your browser. Plain JavaScript, CSS, and a Python standard-library server; no account or build step.
 
+- Two-level library: categories and folders, with search, move, rename, and recoverable Trash
+- Writing-task creation, section-specific practice copies, and JSON import/export
 - Configurable sections, timing, and optional writing tasks
 - Single/multiple choice, multi-blank, numeric, fraction, and sentence-selection answers
 - Mark and review, calculator, and typed/drawn scratchpad
@@ -18,6 +20,8 @@ python3 launch.py
 This starts the local server and opens **http://127.0.0.1:17654** in Chrome on macOS when installed, or your default browser otherwise. Use `MOCK_TEST_PORT=17655 python3 launch.py` to choose another port. To run in the foreground instead, use `python3 server.py`.
 
 ## Add your questions
+
+Use **Add test** inside a folder to create a writing task or import JSON tests. The import dialog includes an example file. Exported tests embed their images and can be imported on another installation. **Create a copy or practice** lets you select sections from an existing test. Trash preserves tests and their attempts until restored.
 
 The included demo has 10 original example questions. Create `data.js` using [data.demo.js](data.demo.js) as the template. Configure each section's `label`, `minutes`, and `calculator`; add `essay` and `essayMinutes` for an optional writing task. Any number of sections is supported. Keep numeric test IDs and question IDs unique and stable.
 
@@ -36,6 +40,6 @@ This copies the app and any local question bank without replacing saved attempts
 Node.js 18+ is needed only for the JavaScript tests.
 
 ```sh
-node --test tests/core.test.cjs
+node --test tests/*.test.cjs
 python3 -m unittest discover -s tests
 ```
