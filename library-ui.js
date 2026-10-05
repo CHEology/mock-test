@@ -207,7 +207,7 @@ function renderLibrary() {
 }
 function librarySelectionHTML() {
   if (!librarySelection.size) return "";
-  return `<span>${librarySelection.size} selected</span>${libraryLocation === "trash" ? '<button data-lib-bulk="restore">Restore</button>' : '<button data-lib-bulk="move">Move</button><button class="danger quiet" data-lib-bulk="trash">Trash</button>'}<button class="quiet" data-lib-bulk="clear" aria-label="Clear selection">×</button>`;
+  return `<span>${librarySelection.size} selected</span>`;
 }
 function libraryItemHTML(r) {
   const trashed = libraryLocation === "trash",
@@ -223,7 +223,7 @@ function libraryItemHTML(r) {
         ? `Latest ${attemptScore(last)}`
         : "Writing saved"
       : "";
-  return `<article class="library-item ${isTest ? "test-file" : "folder-card"} ${librarySelection.has(r.id) ? "selected" : ""}" data-lib-item="${esc(r.id)}" tabindex="0" aria-label="${esc(r.name)}" aria-selected="${librarySelection.has(r.id)}"><div class="item-icon ${r.kind}">${libIcon(r.kind)}</div><div class="item-title">${isTest || trashed ? `<h2>${esc(r.name)}</h2>` : `<button class="folder-open" data-lib-open="${esc(r.id)}">${esc(r.name)}</button>`}${(trashed || libraryQuery) && libraryPath(r) ? `<span class="muted">${esc(libraryPath(r))}</span>` : status ? `<span class="muted">${esc(status)}</span>` : ""}</div><div class="item-actions row">${trashed ? `<button data-lib-restore="${esc(r.id)}">Restore</button>` : isTest && t ? `${attempts.length ? `<button class="quiet" data-history="${r.testId}">${attempts.length} ${attempts.length === 1 ? "attempt" : "attempts"}</button>` : ""}${open ? `<button class="primary" data-resume="${open.id}">Resume</button>` : `<button class="primary" data-start="${r.testId}">${last ? "Try again" : "Start"}</button>`}` : ""}${!trashed ? libraryMenu(r) : ""}</div></article>`;
+  return `<article class="library-item ${isTest ? "test-file" : "folder-card"} ${librarySelection.has(r.id) ? "selected" : ""}" data-lib-item="${esc(r.id)}" tabindex="0" aria-label="${esc(r.name)}" aria-selected="${librarySelection.has(r.id)}"><div class="item-icon ${r.kind}">${libIcon(r.kind)}</div><div class="item-title">${isTest || trashed ? `<h2>${esc(r.name)}</h2>` : `<button class="folder-open" data-lib-open="${esc(r.id)}">${esc(r.name)}</button>`}${(trashed || libraryQuery) && libraryPath(r) ? `<span class="muted">${esc(libraryPath(r))}</span>` : status ? `<span class="muted">${esc(status)}</span>` : ""}</div><div class="item-actions row">${!trashed && isTest && t ? `${attempts.length ? `<button class="quiet" data-history="${r.testId}">${attempts.length} ${attempts.length === 1 ? "attempt" : "attempts"}</button>` : ""}${open ? `<button class="primary" data-resume="${open.id}">Resume</button>` : `<button class="primary" data-start="${r.testId}">${last ? "Try again" : "Start"}</button>`}` : ""}${libraryMenu(r)}</div></article>`;
 }
 function libraryNameDialog(kind, id) {
   const item = id ? libItem(id) : null;
@@ -268,6 +268,26 @@ function libraryNameDialog(kind, id) {
 }
 function libraryItemMenu(id, anchor) {
   const r = libItem(id);
+  if (librarySelection.has(id) && librarySelection.size > 1) {
+    const count = librarySelection.size;
+    const canMove = [...librarySelection].every(
+      (key) => libItem(key)?.kind !== "category",
+    );
+    libraryContextMenu(
+      anchor,
+      libraryLocation === "trash"
+        ? `<button role="menuitem" data-lib-bulk="restore">Restore ${count} items</button>`
+        : `${canMove ? `<button role="menuitem" data-lib-bulk="move">Move ${count} items…</button>` : ""}<button role="menuitem" class="danger" data-lib-bulk="trash">Move ${count} items to Trash</button><button role="menuitem" data-lib-bulk="clear">Clear selection</button>`,
+    );
+    return;
+  }
+  if (libraryLocation === "trash") {
+    libraryContextMenu(
+      anchor,
+      `<button role="menuitem" data-lib-restore="${esc(id)}">Restore</button>`,
+    );
+    return;
+  }
   libraryContextMenu(
     anchor,
     `<button role="menuitem" data-lib-rename="${esc(id)}">Rename</button>${r.kind !== "category" ? `<button role="menuitem" data-lib-move="${esc(id)}">Move to…</button>` : ""}${r.kind === "test" ? `<button role="menuitem" data-lib-copy="${esc(id)}">Create a copy or practice…</button><button role="menuitem" data-lib-export="${esc(id)}">Export test</button>` : ""}<button role="menuitem" class="danger" data-lib-trash="${esc(id)}">Move to Trash</button>`,
@@ -763,13 +783,9 @@ document.addEventListener("pointerdown", (e) => {
   };
   if (item) {
     const id = item.dataset.libItem;
-    if (additive) {
-      librarySelection.has(id)
-        ? librarySelection.delete(id)
-        : librarySelection.add(id);
-    } else if (!librarySelection.has(id)) librarySelection = new Set([id]);
-    libraryGesture.ids = [...librarySelection];
-    paintLibrarySelection();
+    libraryGesture.ids = librarySelection.has(id)
+      ? [...librarySelection]
+      : [id];
   }
 });
 document.addEventListener("pointermove", (e) => {
@@ -787,6 +803,10 @@ document.addEventListener("pointermove", (e) => {
     )
       return;
     g.moved = true;
+    if (g.mode === "move" && !librarySelection.has(g.id)) {
+      librarySelection.clear();
+      paintLibrarySelection();
+    }
     document.documentElement.setPointerCapture(e.pointerId);
     const overlay = document.createElement("div");
     overlay.id = g.mode === "box" ? "library-marquee" : "library-drag-preview";
@@ -807,13 +827,9 @@ document.addEventListener("pointermove", (e) => {
 document.addEventListener("pointerup", (e) => {
   const g = libraryGesture;
   if (!g || g.pointerId !== e.pointerId) return;
-  if (!g.moved && g.mode === "box" && !g.additive) {
+  if (!g.moved) {
     librarySelection.clear();
     paintLibrarySelection();
-  }
-  if (!g.moved && g.additive) {
-    librarySuppressClick = true;
-    setTimeout(() => (librarySuppressClick = false), 0);
   }
   finishLibraryGesture();
 });
@@ -864,25 +880,6 @@ document.addEventListener("keydown", (e) => {
           : (i + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) %
             buttons.length
     ]?.focus();
-  }
-  if (screen !== "home" || e.target.matches("input,textarea,select")) return;
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
-    e.preventDefault();
-    librarySelection = new Set(
-      [...document.querySelectorAll("[data-lib-item]")].map(
-        (el) => el.dataset.libItem,
-      ),
-    );
-    paintLibrarySelection();
-  }
-  const item = e.target.closest("[data-lib-item]");
-  if (item && e.target === item && e.key === " ") {
-    e.preventDefault();
-    const id = item.dataset.libItem;
-    librarySelection.has(id)
-      ? librarySelection.delete(id)
-      : librarySelection.add(id);
-    paintLibrarySelection();
   }
 });
 window.addEventListener("resize", closeLibraryMenu);

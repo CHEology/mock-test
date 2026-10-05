@@ -1075,8 +1075,7 @@ dialog h2 {
   line-height: 1;
 }
 .file-list {
-  border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
 }
 .file-list .library-item {
   display: flex;
@@ -1086,8 +1085,15 @@ dialog h2 {
   border-bottom: 0;
   min-height: 86px;
 }
+.file-list .library-item:first-child {
+  border-radius: 12px 12px 0 0;
+}
 .file-list .library-item:last-child {
   border-bottom: 1px solid var(--line);
+  border-radius: 0 0 12px 12px;
+}
+.file-list .library-item:only-child {
+  border-radius: 12px;
 }
 .file-list .item-title {
   flex: 1;
@@ -1412,8 +1418,6 @@ dialog h2 {
 }
 .library-item.selected {
   background: #e5f0ed;
-  border-color: #689b8f;
-  box-shadow: inset 0 0 0 1px #689b8f;
 }
 .library-item:focus-visible {
   outline: 2px solid var(--teal);
