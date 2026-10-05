@@ -2,6 +2,7 @@
 /data.js
 /assets/
 /.progress/
+/Mock-Test-attempts.json
 /Mock-Test-progress*.json
 /Mock-Test-*-attempt.json
 

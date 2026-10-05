@@ -2,8 +2,10 @@
 const L = window.MockTestLibrary;
 let libraryLocation = "category-default",
   libraryQuery = "",
-  librarySelection = new Set();
+  librarySelection = new Set(),
+  sidebarHidden = false;
 try {
+  sidebarHidden = localStorage.getItem("mock-sidebar-hidden") === "true";
   libraryLocation =
     sessionStorage.getItem("mock-library-location") || libraryLocation;
 } catch (_) {}
@@ -46,6 +48,36 @@ function libraryPath(r) {
 function libraryMenu(r) {
   return `<button class="item-more quiet" data-lib-menu="${esc(r.id)}" aria-label="Manage ${esc(r.name)}">···</button>`;
 }
+function libraryShell(content, location) {
+  const current = libItem(location),
+    category = current?.kind === "folder" ? libItem(current.parent) : current;
+  const categories = db.library.filter(
+    (r) => r.kind === "category" && libVisible(r),
+  );
+  const toggle = `<button class="sidebar-toggle quiet" data-sidebar-toggle aria-label="${sidebarHidden ? "Show sidebar" : "Hide sidebar"}" aria-expanded="${!sidebarHidden}" aria-controls="library-sidebar" title="${sidebarHidden ? "Show sidebar" : "Hide sidebar"}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>`;
+  return `<div class="library-shell ${sidebarHidden ? "sidebar-hidden" : ""}"><aside class="library-sidebar" id="library-sidebar" ${sidebarHidden ? "hidden" : ""}><div class="brand"><b>M</b>Mock Test</div><nav aria-label="Library"><button class="side-link ${location === "all" && screen !== "history" ? "chosen" : ""}" data-lib-open="all">Library</button><div class="side-section"><span>Categories</span><button class="quiet icon-button" data-lib-new="category" aria-label="New category">+</button></div>${categories.map((r) => `<button class="side-link ${category?.id === r.id ? "chosen" : ""}" data-lib-open="${esc(r.id)}">${libIcon("category")}<span>${esc(r.name)}</span></button>`).join("")}<div class="side-bottom"><button class="side-link ${screen === "history" && historyGroup === "all" ? "chosen" : ""}" data-action="history">Attempts</button><button class="side-link ${location === "trash" ? "chosen" : ""}" data-lib-open="trash">Trash</button><button class="side-link" data-action="help">Help</button></div></nav></aside><main class="library-main ${screen === "history" ? "library-history" : ""}"><div class="library-topline">${toggle}<nav class="breadcrumbs" aria-label="Breadcrumb"><button data-lib-open="all">Library</button>${category ? `<span>/</span><button data-lib-open="${esc(category.id)}" ${current?.kind === "category" ? 'aria-current="page"' : ""}>${esc(category.name)}</button>` : ""}${current?.kind === "folder" ? `<span>/</span><button data-lib-open="${esc(current.id)}" aria-current="page">${esc(current.name)}</button>` : ""}${location === "trash" ? '<span>/</span><span aria-current="page">Trash</span>' : ""}</nav></div>${content}</main></div>`;
+}
+function libraryTabs(location, attempts = false) {
+  const current = libItem(location);
+  if (!current || !["category", "folder"].includes(current.kind)) return "";
+  return `<nav class="library-tabs" aria-label="${esc(current.name)} views"><button data-lib-open="${esc(location)}" ${!attempts ? 'aria-current="page"' : ""}>${current.kind === "category" ? "Folders" : "Tests"}</button><button data-group-attempts="${esc(location)}" ${attempts ? 'aria-current="page"' : ""}>Attempts</button></nav>`;
+}
+function toggleLibrarySidebar() {
+  sidebarHidden = !sidebarHidden;
+  try {
+    localStorage.setItem("mock-sidebar-hidden", String(sidebarHidden));
+  } catch (_) {}
+  $(".library-shell").classList.toggle("sidebar-hidden", sidebarHidden);
+  $("#library-sidebar").hidden = sidebarHidden;
+  const button = $("[data-sidebar-toggle]");
+  button.setAttribute("aria-expanded", String(!sidebarHidden));
+  button.setAttribute(
+    "aria-label",
+    sidebarHidden ? "Show sidebar" : "Hide sidebar",
+  );
+  button.title = sidebarHidden ? "Show sidebar" : "Hide sidebar";
+}
+
 function renderLibrary() {
   if (
     !["all", "trash"].includes(libraryLocation) &&
@@ -55,11 +87,7 @@ function renderLibrary() {
   try {
     sessionStorage.setItem("mock-library-location", libraryLocation);
   } catch (_) {}
-  const current = libItem(libraryLocation),
-    category = current?.kind === "folder" ? libItem(current.parent) : current;
-  const categories = db.library.filter(
-    (r) => r.kind === "category" && libVisible(r),
-  );
+  const current = libItem(libraryLocation);
   let items =
     libraryLocation === "trash"
       ? db.library.filter((r) => r.trashed)
@@ -95,7 +123,10 @@ function renderLibrary() {
       : libraryLocation === "trash"
         ? "Trash"
         : current.name;
-  app.innerHTML = `<div class="library-shell"><aside class="library-sidebar"><div class="brand"><b>M</b>Mock Test</div><nav aria-label="Library"><button class="side-link ${libraryLocation === "all" ? "chosen" : ""}" data-lib-open="all">Library</button><div class="side-section"><span>Categories</span><button class="quiet icon-button" data-lib-new="category" aria-label="New category">+</button></div>${categories.map((r) => `<button class="side-link ${category?.id === r.id ? "chosen" : ""}" data-lib-open="${esc(r.id)}">${libIcon("category")}<span>${esc(r.name)}</span></button>`).join("")}<div class="side-bottom"><button class="side-link" data-action="history">Attempts</button><button class="side-link ${libraryLocation === "trash" ? "chosen" : ""}" data-lib-open="trash">Trash</button><button class="side-link" data-action="help">Help</button></div></nav></aside><main class="library-main"><nav class="breadcrumbs" aria-label="Breadcrumb"><button data-lib-open="all">Library</button>${category ? `<span>/</span><button data-lib-open="${esc(category.id)}" ${current?.kind === "category" ? 'aria-current="page"' : ""}>${esc(category.name)}</button>` : ""}${current?.kind === "folder" ? `<span>/</span><span aria-current="page">${esc(current.name)}</span>` : ""}${libraryLocation === "trash" ? '<span>/</span><span aria-current="page">Trash</span>' : ""}</nav><header class="library-heading row spread"><h1>${esc(title)}</h1><div class="row">${current ? libraryMenu(current) : ""}${libraryLocation === "all" ? '<button class="primary" data-lib-new="category">+ Category</button>' : current?.kind === "category" ? '<button class="primary" data-lib-new="folder">+ Folder</button>' : current?.kind === "folder" ? '<button class="primary" data-lib-add>Add test</button>' : ""}</div></header><div class="library-tools row spread"><input type="search" id="library-search" aria-label="Search library" placeholder="Search${current ? " in " + esc(current.name) : ""}" value="${esc(libraryQuery)}"><div class="row" id="library-selection-actions">${librarySelectionHTML()}</div></div><div class="library-items ${items.every((r) => r.kind === "category" || r.kind === "folder") && items.length ? "folder-grid" : "file-list"}">${items.map((r) => libraryItemHTML(r)).join("") || `<div class="library-empty">${libraryQuery ? "No matches." : libraryLocation === "trash" ? "Trash is empty." : current?.kind === "folder" ? "No tests yet." : libraryLocation === "all" ? "No categories yet." : "No folders yet."}</div>`}</div></main></div>`;
+  app.innerHTML = libraryShell(
+    `<header class="library-heading row spread"><h1>${esc(title)}</h1><div class="row">${current ? libraryMenu(current) : ""}${libraryLocation === "all" ? '<button class="primary" data-lib-new="category">+ Category</button>' : current?.kind === "category" ? '<button class="primary" data-lib-new="folder">+ Folder</button>' : current?.kind === "folder" ? '<button class="primary" data-lib-add>Add test</button>' : ""}</div></header>${libraryTabs(libraryLocation)}<div class="library-tools row spread"><input type="search" id="library-search" aria-label="Search library" placeholder="Search${current ? " in " + esc(current.name) : ""}" value="${esc(libraryQuery)}"><div class="row" id="library-selection-actions">${librarySelectionHTML()}</div></div><div class="library-items ${items.every((r) => r.kind === "category" || r.kind === "folder") && items.length ? "folder-grid" : "file-list"}">${items.map((r) => libraryItemHTML(r)).join("") || `<div class="library-empty">${libraryQuery ? "No matches." : libraryLocation === "trash" ? "Trash is empty." : current?.kind === "folder" ? "No tests yet." : libraryLocation === "all" ? "No categories yet." : "No folders yet."}</div>`}</div>`,
+    libraryLocation,
+  );
 }
 function librarySelectionHTML() {
   if (!librarySelection.size) return "";
@@ -380,7 +411,9 @@ function libraryImportDialog() {
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
-  if (b.dataset.libOpen) libraryNavigate(b.dataset.libOpen);
+  if (b.hasAttribute("data-sidebar-toggle")) toggleLibrarySidebar();
+  else if (b.dataset.groupAttempts) groupHistory(b.dataset.groupAttempts);
+  else if (b.dataset.libOpen) libraryNavigate(b.dataset.libOpen);
   else if (b.dataset.libNew) libraryNameDialog(b.dataset.libNew);
   else if (b.dataset.libMenu) libraryItemMenu(b.dataset.libMenu);
   else if (b.dataset.libRename)

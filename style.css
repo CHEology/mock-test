@@ -1241,3 +1241,55 @@ dialog h2 {
     width: 100%;
   }
 }
+
+.library-shell.sidebar-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+.library-sidebar[hidden] {
+  display: none;
+}
+.library-topline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  border: 0;
+  flex-shrink: 0;
+}
+.sidebar-toggle svg {
+  width: 23px;
+  height: 23px;
+}
+.library-tabs {
+  display: flex;
+  gap: 26px;
+  border-bottom: 1px solid var(--line);
+  margin: -6px 0 26px;
+}
+.library-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 12px 0;
+  background: transparent;
+  color: var(--muted);
+}
+.library-tabs button[aria-current] {
+  border-bottom-color: var(--teal);
+  color: var(--teal);
+  font-weight: 600;
+}
+.library-tabs button:hover {
+  color: var(--ink);
+}
+.library-history {
+  min-width: 0;
+}
+.library-history .library-heading {
+  flex-wrap: wrap;
+}

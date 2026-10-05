@@ -126,3 +126,24 @@ test("imports accept writing-only tests and reject broken questions or remote im
   }
   assert.throws(() => L.validateTest({ sections: [] }));
 });
+
+test("category and folder scopes isolate their tests, including saved history of trashed items", () => {
+  const records = [
+    ...initial(),
+    { id: "writing-1", kind: "test", testId: 2, parent: "folder-writing" },
+    { id: "other-category", kind: "category", name: "Other" },
+    { id: "other-folder", kind: "folder", parent: "other-category" },
+    { id: "other-test", kind: "test", testId: 3, parent: "other-folder" },
+  ];
+  assert.deepEqual([...L.testIds(records, "category-default")].sort(), [1, 2]);
+  assert.deepEqual([...L.testIds(records, "folder-default")], [1]);
+  assert.deepEqual([...L.testIds(records, "folder-writing")], [2]);
+  assert.deepEqual([...L.testIds(records, "other-category")], [3]);
+  assert.deepEqual([...L.testIds(records, "all")].sort(), [1, 2, 3]);
+  assert.equal(L.testIds(records, "missing").size, 0);
+  const moved = L.move(records, ["test-1"], "other-folder", 100);
+  assert.deepEqual([...L.testIds(moved, "category-default")], [2]);
+  assert.deepEqual([...L.testIds(moved, "other-category")].sort(), [1, 3]);
+  const trashed = L.trash(records, ["test-1"], 200);
+  assert.deepEqual([...L.testIds(trashed, "folder-default")], [1]);
+});

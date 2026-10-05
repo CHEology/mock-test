@@ -197,6 +197,29 @@
     }
     return t;
   }
-  root.MockTestLibrary = { seed, visible, move, trash, restore, validateTest };
+  function testIds(records, scope = "all") {
+    const group = records.find((r) => r.id === scope);
+    return new Set(
+      records
+        .filter(
+          (r) =>
+            r.kind === "test" &&
+            (scope === "all" ||
+              (group?.kind === "folder" && r.parent === scope) ||
+              (group?.kind === "category" &&
+                records.find((p) => p.id === r.parent)?.parent === scope)),
+        )
+        .map((r) => r.testId),
+    );
+  }
+  root.MockTestLibrary = {
+    testIds,
+    seed,
+    visible,
+    move,
+    trash,
+    restore,
+    validateTest,
+  };
   if (typeof module !== "undefined") module.exports = root.MockTestLibrary;
 })(typeof window === "undefined" ? globalThis : window);

@@ -7,6 +7,7 @@ const C = window.MockTestCore,
   modal = $("#modal");
 let db = { version: 1, attempts: [], deleted: {} },
   historyTest = "all",
+  historyGroup = "all",
   historyStatus = "all",
   selectedAttempts = new Set(),
   pendingDelete = null,
@@ -185,11 +186,16 @@ function renderHome() {
   document.title = "Mock Test";
   renderLibrary();
 }
+function historyTests() {
+  const ids = L.testIds(db.library, historyGroup);
+  return DATA.filter((t) => ids.has(t.id));
+}
 function historyAttempts() {
+  const tests = historyTests();
   return db.attempts
     .filter(
       (a) =>
-        DATA.some((t) => t.id === a.test) &&
+        tests.some((t) => t.id === a.test) &&
         (historyTest === "all" || a.test === Number(historyTest)) &&
         (historyStatus === "all" ||
           (historyStatus === "done"
@@ -199,7 +205,19 @@ function historyAttempts() {
     .sort((a, b) => b.created - a.created);
 }
 function historyDialog(scope = "all") {
+  const item = db.library.find(
+    (r) => r.kind === "test" && r.testId === Number(scope),
+  );
+  historyGroup = scope === "all" ? "all" : item?.parent || "all";
   historyTest = String(scope);
+  historyStatus = "all";
+  selectedAttempts.clear();
+  renderHistory();
+}
+function groupHistory(group) {
+  historyGroup = group;
+  libraryLocation = group;
+  historyTest = "all";
   historyStatus = "all";
   selectedAttempts.clear();
   renderHistory();
@@ -210,12 +228,20 @@ function renderHistory() {
   screen = "history";
   active = null;
   reviewing = false;
+  const tests = historyTests();
+  if (historyTest !== "all" && !tests.some((t) => String(t.id) === historyTest))
+    historyTest = "all";
   const attempts = historyAttempts();
   selectedAttempts = new Set(
     [...selectedAttempts].filter((id) => attempts.some((a) => a.id === id)),
   );
-  document.title = "Attempts | Mock Test";
-  app.innerHTML = `<main class="history-page"><header class="row spread">${homeButton()}<div class="row"><button data-action="export">Export</button>${historyTest !== "all" ? `<button class="primary" data-start="${historyTest}">New attempt</button>` : ""}</div></header><h1>Attempts</h1><div class="history-tools row spread"><div class="row"><select id="history-test" aria-label="Filter by test"><option value="all">All tests</option>${DATA.map((t) => `<option value="${t.id}" ${String(t.id) === historyTest ? "selected" : ""}>${esc(testName(t))}</option>`).join("")}</select><select id="history-status" aria-label="Filter by status"><option value="all">All attempts</option><option value="done" ${historyStatus === "done" ? "selected" : ""}>Results</option><option value="open" ${historyStatus === "open" ? "selected" : ""}>In progress</option></select></div><div class="row"><button class="danger ${selectedAttempts.size ? "" : "hidden"}" id="delete-selected" data-action="delete-selected">Delete selected (${selectedAttempts.size})</button>${attempts.some((a) => a.status === "done") ? '<button class="danger quiet" data-action="clear-results">Clear results</button>' : ""}</div></div>${attempts.length ? `<div class="history-table"><table><thead><tr><th><input id="select-attempts" type="checkbox" aria-label="Select all visible attempts" ${selectedAttempts.size === attempts.length ? "checked" : ""}></th><th>Test</th><th>Started</th><th>Mode</th><th>Result / progress</th><th></th></tr></thead><tbody>${attempts.map((a) => `<tr><td><input type="checkbox" data-select-attempt="${a.id}" aria-label="Select attempt from ${esc(new Date(a.created).toLocaleString())}" ${selectedAttempts.has(a.id) ? "checked" : ""}></td><td>${esc(testName(DATA.find((t) => t.id === a.test)))}</td><td>${esc(new Date(a.created).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</td><td>${a.mode === "timed" ? "Timed" : "Untimed"}</td><td>${esc(attemptStatus(a))}</td><td><div class="row"><button ${a.status === "done" ? "data-results" : "data-resume"}="${a.id}">${a.status === "done" ? "Review" : "Resume"}</button><button class="quiet danger" data-delete="${a.id}">Delete</button></div></td></tr>`).join("")}</tbody></table></div>` : '<p class="empty-state">No attempts.</p>'}</main>`;
+  const group = libItem(historyGroup);
+  const title = group?.name || "Attempts";
+  document.title = `${group ? title + " · " : ""}Attempts | Mock Test`;
+  app.innerHTML = libraryShell(
+    `<header class="library-heading row spread"><h1>${esc(title)}</h1><div class="row"><button data-action="export-history">Export</button>${historyTest !== "all" ? `<button class="primary" data-start="${historyTest}">New attempt</button>` : ""}</div></header>${libraryTabs(historyGroup, true)}<div class="history-tools row spread"><div class="row"><select id="history-test" aria-label="Filter by test"><option value="all">All tests</option>${tests.map((t) => `<option value="${t.id}" ${String(t.id) === historyTest ? "selected" : ""}>${esc(testName(t))}</option>`).join("")}</select><select id="history-status" aria-label="Filter by status"><option value="all">All attempts</option><option value="done" ${historyStatus === "done" ? "selected" : ""}>Results</option><option value="open" ${historyStatus === "open" ? "selected" : ""}>In progress</option></select></div><div class="row"><button class="danger ${selectedAttempts.size ? "" : "hidden"}" id="delete-selected" data-action="delete-selected">Delete selected (${selectedAttempts.size})</button>${attempts.some((a) => a.status === "done") ? '<button class="danger quiet" data-action="clear-results">Clear results</button>' : ""}</div></div>${attempts.length ? `<div class="history-table"><table><thead><tr><th><input id="select-attempts" type="checkbox" aria-label="Select all visible attempts" ${selectedAttempts.size === attempts.length ? "checked" : ""}></th><th>Test</th><th>Started</th><th>Mode</th><th>Result / progress</th><th></th></tr></thead><tbody>${attempts.map((a) => `<tr><td><input type="checkbox" data-select-attempt="${a.id}" aria-label="Select attempt from ${esc(new Date(a.created).toLocaleString())}" ${selectedAttempts.has(a.id) ? "checked" : ""}></td><td>${esc(testName(DATA.find((t) => t.id === a.test)))}</td><td>${esc(new Date(a.created).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</td><td>${a.mode === "timed" ? "Timed" : "Untimed"}</td><td>${esc(attemptStatus(a))}</td><td><div class="row"><button ${a.status === "done" ? "data-results" : "data-resume"}="${a.id}">${a.status === "done" ? "Review" : "Resume"}</button><button class="quiet danger" data-delete="${a.id}">Delete</button></div></td></tr>`).join("")}</tbody></table></div>` : '<p class="empty-state">No attempts.</p>'}`,
+    historyGroup,
+  );
 }
 function updateSelection() {
   const attempts = historyAttempts();
@@ -265,6 +291,10 @@ function startDialog(id) {
   );
 }
 function begin(id) {
+  historyGroup =
+    db.library.find((r) => r.kind === "test" && r.testId === id)?.parent ||
+    "all";
+  historyTest = String(id);
   const mode = $("input[name=mode]:checked").value,
     essay = !!$("#include-essay")?.checked;
   active = {
@@ -769,7 +799,8 @@ async function action(name) {
       renderHome();
       break;
     case "results-history":
-      historyDialog(active.test);
+      if (historyTests().some((t) => t.id === active.test)) renderHistory();
+      else historyDialog(active.test);
       break;
     case "delete-current":
       deleteDialog([active.id]);
@@ -804,6 +835,12 @@ async function action(name) {
       break;
     case "close-scratch":
       $("#scratchpad")?.remove();
+      break;
+    case "export-history":
+      downloadJSON(
+        { version: 1, attempts: historyAttempts() },
+        "Mock-Test-attempts.json",
+      );
       break;
     case "export":
       exportData();

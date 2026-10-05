@@ -2,7 +2,8 @@
 
 A general-purpose mock-test interface that runs locally in your browser. Plain JavaScript, CSS, and a Python standard-library server; no account or build step.
 
-- Two-level library: categories and folders, with search, move, rename, and recoverable Trash
+- Two-level library: categories and folders, with scoped attempt tabs and a collapsible sidebar
+- Search, move, rename, and recoverable Trash
 - Writing-task creation, section-specific practice copies, and JSON import/export
 - Configurable sections, timing, and optional writing tasks
 - Single/multiple choice, multi-blank, numeric, fraction, and sentence-selection answers
