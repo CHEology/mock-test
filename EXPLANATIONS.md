@@ -6,10 +6,10 @@ Mock Test can ask a locally installed Codex CLI or Claude Code to explain a ques
 
 The tutor bridge supports macOS and Linux. On Windows, run both Mock Test and the chosen CLI inside WSL; native Windows process management is not supported by this bridge. Install Python 3.9+ and use a current browser.
 
-1. Download or clone this repository. While the feature is experimental, select the `codex/features-ai-explanations` branch before downloading, or clone it directly:
+1. Download or clone this repository:
 
    ```sh
-   git clone --branch codex/features-ai-explanations https://github.com/CHEology/mock-test.git
+   git clone https://github.com/CHEology/mock-test.git
    cd mock-test
    ```
 

@@ -36,7 +36,8 @@ def sync(destination):
                 'CFBundleName': 'Mock Test',
                 'CFBundleIconFile': 'MockTest.icns',
                 'CFBundlePackageType': 'APPL',
-                'CFBundleVersion': '1.0.2',
+                'CFBundleVersion': '1.1.0',
+                'CFBundleShortVersionString': '1.1.0',
                 'NSDesktopFolderUsageDescription': 'Read your local question files and save your practice progress.',
                 'LSUIElement': True,
             }, stream)

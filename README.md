@@ -34,7 +34,7 @@ The included demo has 10 original example questions. Create `data.js` using [dat
 
 Questions can use `text`, `labels`, and `options`, or an `image` path such as `assets/01-01.webp`. `data.js`, `assets/`, and attempts in `.progress/` stay outside Git. Results report accuracy against the supplied key; writing responses are saved without automatic grading.
 
-## Explanations (experimental)
+## Explanations
 
 See the [explanation setup and usage guide](EXPLANATIONS.md) for a fresh-device walkthrough and troubleshooting.
 
@@ -48,7 +48,7 @@ During attempts, explanations are **Off** by default. Choose **Hints only** or *
 
 Conversations are saved separately per attempt, question, mode, and language in `.progress/explanations.json`. Deleting an attempt deletes its conversations and stops its jobs. Back up `.progress/` to include explanations; ordinary attempt JSON exports contain answers only. Interrupted jobs are marked for manual retry after a server restart.
 
-The adapters attach question images directly, use isolated temporary directories, and disable shell / connector access for the tutor. On macOS, the adapter also detects Claude Code bundled with Claude Desktop. Both providers need a valid local login. Keep this feature branch on a separate port and copy of `.progress/` when experimenting.
+The adapters attach question images directly, use isolated temporary directories, and disable shell / connector access for the tutor. On macOS, the adapter also detects Claude Code bundled with Claude Desktop. Both providers need a valid local login.
 
 ## Keep a local copy in sync
 
