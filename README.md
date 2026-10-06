@@ -40,6 +40,8 @@ See the [explanation setup and usage guide](EXPLANATIONS.md) for a fresh-device 
 
 Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://code.claude.com/docs/en/quickstart) locally. In Settings → Explanations choose a channel, a High / Medium / Low model tier (default Medium), Chinese or English, and a preset prompt. Passage, question, and option quotations retain their original English wording. The CLI sends questions to its provider using your signed-in account; this is not offline inference. No API key is stored by this app.
 
+The **Explanations** master switch in Settings defaults to on. Switching it off hides all tutor controls and its detailed settings immediately, while preserving saved conversations and preferences.
+
 Results have **Explain** per question and **Explain all incorrect** for answered, incorrect questions. Unanswered and disputed questions can still be explained individually. Writing tasks have **Review writing** for argument, structure, and language feedback, with **Review current draft** after edits. Conversations and follow-ups appear inline. Jobs run one at a time and can be stopped or retried. Leaving a page does not stop a submitted job.
 
 During attempts, explanations are **Off** by default. Choose **Hints only** or **Full explanations** to enable them. Hint requests omit the supplied answer key and prior full explanations; the model is instructed to avoid giving the answer. The timer keeps running.

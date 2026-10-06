@@ -134,6 +134,7 @@
   function preferences(value = {}) {
     if (!value || typeof value !== "object") value = {};
     return {
+      aiEnabled: value.aiEnabled !== false,
       aiLanguage: value.aiLanguage === "en" ? "en" : "zh",
       aiProvider: value.aiProvider === "claude" ? "claude" : "codex",
       aiTier: ["high", "low"].includes(value.aiTier) ? value.aiTier : "medium",

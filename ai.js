@@ -9,7 +9,9 @@ const AI = (() => {
     batch = null;
   const busy = (r) => r && ["queued", "running"].includes(r.status);
   const allowed = () =>
-    !!active && (active.status === "done" || settings.aiDuring !== "off");
+    settings.aiEnabled &&
+    !!active &&
+    (active.status === "done" || settings.aiDuring !== "off");
   const mode = () => (active.status === "done" ? "full" : settings.aiDuring);
   const key = (t) =>
     JSON.stringify([
@@ -56,7 +58,8 @@ const AI = (() => {
     allowed()
       ? `<button data-ai="open">${mode() === "hint" ? "Hint" : active.section < 0 ? "Review writing" : "Explain"}</button>`
       : "";
-  const slot = () => '<div id="ai-panel-slot"></div>';
+  const slot = () =>
+    settings.aiEnabled ? '<div id="ai-panel-slot"></div>' : "";
   async function api(path, value) {
     const response = await fetch(
       "/api/ai/" + path,
@@ -164,7 +167,7 @@ const AI = (() => {
   }
   function batchStatus() {
     const el = $("#ai-batch");
-    if (!el || !active) return;
+    if (!el || !active || !settings.aiEnabled) return;
     const all = records(active.id).filter((r) => r.mode === "full"),
       pending = all.filter(busy).length;
     const failed = all.filter((r) => r.status === "error").length;
@@ -201,7 +204,7 @@ const AI = (() => {
   function mount() {
     paint();
     batchStatus();
-    if (active && ["test", "results"].includes(screen))
+    if (settings.aiEnabled && active && ["test", "results"].includes(screen))
       refresh(active.id).catch(() => {});
   }
   async function open(si, qi) {
@@ -230,7 +233,7 @@ const AI = (() => {
     }
   }
   async function submit(a, si, qi, selectedMode, followup = "") {
-    if (submitting) return;
+    if (!settings.aiEnabled || submitting) return;
     // Snapshot the question, answer, and preferences before any asynchronous work.
     const request = payload(a, si, qi, selectedMode, followup);
     errors.delete(
@@ -249,6 +252,7 @@ const AI = (() => {
         throw Error(
           "Save the attempt to disk before requesting an explanation.",
         );
+      if (!settings.aiEnabled) return;
       await api("explain", request);
       await refresh(a.id);
     } finally {
@@ -275,7 +279,8 @@ const AI = (() => {
     }
   }
   async function explainWrong() {
-    if (!active || active.status !== "done" || batch) return;
+    if (!settings.aiEnabled || !active || active.status !== "done" || batch)
+      return;
     const a = active,
       t = test(),
       todo = [];
@@ -300,7 +305,7 @@ const AI = (() => {
         throw Error("Save the attempt to disk first.");
       const requests = todo.map(([si, qi]) => payload(a, si, qi, "full"));
       for (const request of requests) {
-        if (token.stop) break;
+        if (token.stop || !settings.aiEnabled) break;
         if (
           records(a.id).some(
             (r) =>
@@ -325,6 +330,7 @@ const AI = (() => {
     }
   }
   async function providers() {
+    if (!settings.aiEnabled) return;
     try {
       const found = await api("providers");
       for (const [name, label] of [
@@ -341,7 +347,7 @@ const AI = (() => {
   }
   document.addEventListener("click", async (e) => {
     const button = e.target.closest("[data-ai]");
-    if (!button || button.disabled) return;
+    if (!settings.aiEnabled || !button || button.disabled) return;
     e.preventDefault();
     try {
       switch (button.dataset.ai) {
@@ -390,7 +396,13 @@ const AI = (() => {
     }
   });
   setInterval(async () => {
-    if (polling || !active || !["test", "results"].includes(screen)) return;
+    if (
+      !settings.aiEnabled ||
+      polling ||
+      !active ||
+      !["test", "results"].includes(screen)
+    )
+      return;
     if (!records(active.id).some(busy)) return;
     polling = true;
     try {
@@ -400,5 +412,9 @@ const AI = (() => {
       polling = false;
     }
   }, 1800);
-  return { button, slot, mount, providers, context };
+  function reset() {
+    target = null;
+    if (!settings.aiEnabled && batch) batch.stop = true;
+  }
+  return { button, slot, mount, providers, context, reset };
 })();

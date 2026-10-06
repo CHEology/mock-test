@@ -112,6 +112,7 @@ test("state merging keeps independent attempts and the newest revision", () => {
 
 test("test preferences default to focus mode and preserve explicit opt-outs", () => {
   assert.deepEqual(C.preferences(), {
+    aiEnabled: true,
     aiLanguage: "zh",
     aiProvider: "codex",
     aiTier: "medium",
@@ -130,6 +131,7 @@ test("test preferences default to focus mode and preserve explicit opt-outs", ()
       showTimer: false,
     }),
     {
+      aiEnabled: true,
       aiLanguage: "zh",
       aiProvider: "codex",
       aiTier: "medium",
@@ -174,4 +176,16 @@ test("model presets replace manual names and default to Medium", () => {
   for (const tier of ["high", "medium", "low"])
     assert.equal(C.preferences({ aiTier: tier }).aiTier, tier);
   assert.equal(C.preferences({ aiTier: "bad" }).aiTier, "medium");
+});
+
+test("explanations default on and preserve the master opt-out independently of exam mode", () => {
+  assert.equal(C.preferences().aiEnabled, true);
+  const settings = C.preferences({
+    aiEnabled: false,
+    aiDuring: "full",
+    aiTier: "high",
+  });
+  assert.equal(settings.aiEnabled, false);
+  assert.equal(settings.aiDuring, "full");
+  assert.equal(settings.aiTier, "high");
 });

@@ -43,3 +43,24 @@ test("writing context captures the current draft without a multiple-choice key",
   assert.equal(out.task, "writing");
   assert.equal(Object.hasOwn(out, "key"), false);
 });
+
+test("master switch hides every test-mode entry and skips provider discovery", async () => {
+  sandbox.settings = { aiEnabled: false, aiDuring: "full" };
+  sandbox.fetch = () => {
+    throw Error("Disabled explanations must not query providers");
+  };
+  for (const status of ["done", "running"]) {
+    for (const section of [-1, 0]) {
+      sandbox.active = { status, section };
+      assert.equal(AI.button(), "");
+      assert.equal(AI.slot(), "");
+    }
+  }
+  await AI.providers();
+  sandbox.settings.aiEnabled = true;
+  assert.match(AI.button(), /Explain/);
+  sandbox.active.section = -1;
+  assert.match(AI.button(), /Review writing/);
+  sandbox.settings.aiDuring = "hint";
+  assert.match(AI.button(), /Hint/);
+});

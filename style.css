@@ -1630,3 +1630,36 @@ dialog h2 {
     align-items: stretch;
   }
 }
+
+.explanation-heading {
+  margin-bottom: 8px;
+}
+.explanation-heading h2 {
+  margin: 0;
+}
+.setting-switch {
+  appearance: none;
+  width: 50px;
+  height: 28px;
+  border: 0;
+  border-radius: 20px;
+  background: #b8c6c8;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.setting-switch::before {
+  content: "";
+  display: block;
+  width: 22px;
+  height: 22px;
+  margin: 3px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.15s;
+}
+.setting-switch:checked {
+  background: var(--teal);
+}
+.setting-switch:checked::before {
+  transform: translateX(22px);
+}
