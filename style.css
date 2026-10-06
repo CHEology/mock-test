@@ -492,6 +492,23 @@ p {
 .result-options p {
   margin: 8px 0;
 }
+.result-detail-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.result-collapse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-color: transparent;
+  color: var(--muted);
+}
+.result-collapse svg {
+  width: 18px;
+  height: 18px;
+}
 .result-detail .ai-panel {
   margin-bottom: 0;
 }

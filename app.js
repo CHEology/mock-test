@@ -618,7 +618,7 @@ function renderResults() {
         `<h3 style="margin-top:32px">${esc(s.label)}</h3><table><thead><tr><th>Question</th><th>Your answer</th><th>Key</th><th>Result</th><th></th></tr></thead><tbody>${s.questions
           .map((q, qi) => {
             const g = C.grade(q, active.answers[q.id]);
-            return `<tr><td>${q.number}${active.flags[q.id] ? " ★" : ""}</td><td>${esc(C.display(q, active.answers[q.id]))}</td><td>${esc(q.key)}</td><td class="${g === null ? "tag-dispute" : g ? "tag-correct" : "tag-incorrect"}">${g === null ? "Disputed" : g ? "Correct" : C.answered(q, active.answers[q.id]) ? "Incorrect" : "Unanswered"}</td><td><div class="result-actions"><button data-result-question="${si},${qi}" aria-expanded="false" aria-controls="result-detail-${si}-${qi}">Question</button>${settings.aiEnabled ? `<button data-ai="question" data-ai-question="${esc(q.id)}" data-ai-position="${si},${qi}" aria-expanded="false" aria-controls="result-detail-${si}-${qi}">Explain</button>` : ""}</div></td></tr><tr id="result-detail-${si}-${qi}" class="result-detail" hidden><td colspan="5"><div class="result-question"></div>${AI.slot(si, qi)}</td></tr>`;
+            return `<tr><td>${q.number}${active.flags[q.id] ? " ★" : ""}</td><td>${esc(C.display(q, active.answers[q.id]))}</td><td>${esc(q.key)}</td><td class="${g === null ? "tag-dispute" : g ? "tag-correct" : "tag-incorrect"}">${g === null ? "Disputed" : g ? "Correct" : C.answered(q, active.answers[q.id]) ? "Incorrect" : "Unanswered"}</td><td><div class="result-actions"><button data-result-question="${si},${qi}" aria-expanded="false" aria-controls="result-detail-${si}-${qi}">Question</button>${settings.aiEnabled ? `<button data-ai="question" data-ai-question="${esc(q.id)}" data-ai-position="${si},${qi}" aria-expanded="false" aria-controls="result-detail-${si}-${qi}">Explain</button>` : ""}</div></td></tr><tr id="result-detail-${si}-${qi}" class="result-detail" hidden><td colspan="5"><div class="result-question"></div>${AI.slot(si, qi)}<div class="result-detail-footer"><button class="result-collapse quiet" data-result-collapse="${si},${qi}" aria-controls="result-detail-${si}-${qi}"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m5 12 5-5 5 5"/></svg>Collapse</button></div></td></tr>`;
           })
           .join("")}</tbody></table>`,
     )
@@ -1122,6 +1122,19 @@ document.addEventListener("click", (e) => {
   } else if (el.dataset.calc) calc(el.dataset.calc);
   else if (el.dataset.resultQuestion) {
     toggleResultQuestion(...el.dataset.resultQuestion.split(",").map(Number));
+  } else if (el.dataset.resultCollapse) {
+    const [si, qi] = el.dataset.resultCollapse.split(",").map(Number);
+    const row = $(`#result-detail-${si}-${qi}`);
+    if (!row || row.hidden) return;
+    const explain = row.dataset.mode === "explanation";
+    toggleResultQuestion(si, qi, explain);
+    const button = $(
+      explain
+        ? `[data-ai-position="${si},${qi}"]`
+        : `[data-result-question="${si},${qi}"]`,
+    );
+    button?.focus({ preventScroll: true });
+    row.previousElementSibling.scrollIntoView({ block: "nearest" });
   }
 });
 document.addEventListener("change", (e) => {
