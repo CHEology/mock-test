@@ -12,16 +12,36 @@ const AI = (() => {
     !!active && (active.status === "done" || settings.aiDuring !== "off");
   const mode = () => (active.status === "done" ? "full" : settings.aiDuring);
   const key = (t) =>
-    JSON.stringify([t.attempt, t.question, t.mode, t.language]);
+    JSON.stringify([
+      t.attempt,
+      t.question,
+      t.mode,
+      t.language,
+      t.si < 0 ? "writing" : "question",
+    ]);
   const records = (attempt) => cache.get(attempt) || [];
   const record = () =>
     target &&
     records(target.attempt).find(
       (r) =>
         r.question === target.question &&
+        (r.kind || "question") === (target.si < 0 ? "writing" : "question") &&
         r.mode === target.mode &&
         (r.language || "zh") === target.language,
     );
+  const writing = (a = active) => ({
+    id: "@writing",
+    text: DATA.find((t) => t.id === a.test).essay,
+    task: "writing",
+  });
+  const currentId = () => (active?.section < 0 ? "@writing" : question()?.id);
+  const item = (a, si, qi) =>
+    si < 0
+      ? { s: { label: "Writing" }, q: writing(a) }
+      : {
+          s: DATA.find((t) => t.id === a.test).sections[si],
+          q: DATA.find((t) => t.id === a.test).sections[si].questions[qi],
+        };
   const visible = () =>
     target &&
     active?.id === target.attempt &&
@@ -30,11 +50,11 @@ const AI = (() => {
     (screen === "results" ||
       (screen === "test" &&
         !testHelpOpen &&
-        question()?.id === target.question &&
+        currentId() === target.question &&
         mode() === target.mode));
   const button = () =>
     allowed()
-      ? `<button data-ai="open">${mode() === "hint" ? "Hint" : "Explain"}</button>`
+      ? `<button data-ai="open">${mode() === "hint" ? "Hint" : active.section < 0 ? "Review writing" : "Explain"}</button>`
       : "";
   const slot = () => '<div id="ai-panel-slot"></div>';
   async function api(path, value) {
@@ -54,6 +74,8 @@ const AI = (() => {
     return data;
   }
   function context(q, s, a, mode) {
+    if (q.task === "writing")
+      return { task: "writing", prompt: q.text, response: a.essay || "" };
     const result = {
       section: s.title || s.label,
       answer: a.answers[q.id] ?? null,
@@ -76,15 +98,14 @@ const AI = (() => {
     return result;
   }
   function payload(a, si, qi, mode, followup = "") {
-    const s = DATA.find((t) => t.id === a.test).sections[si],
-      q = s.questions[qi];
+    const { s, q } = item(a, si, qi);
     return {
       attempt: a.id,
       question: q.id,
       mode,
       provider: settings.aiProvider,
       language: settings.aiLanguage,
-      model: settings.aiModel,
+      tier: settings.aiTier,
       prompt: settings.aiPrompt,
       followup,
       context: context(q, s, a, mode),
@@ -101,11 +122,9 @@ const AI = (() => {
       return;
     }
     const r = record(),
-      t = DATA.find((t) => t.id === active.test),
-      s = t.sections[target.si],
-      q = s.questions[target.qi];
+      { s, q } = item(active, target.si, target.qi);
     if (!$("#ai-panel") || $("#ai-panel").dataset.key !== key(target)) {
-      slot.innerHTML = `<section id="ai-panel" class="ai-panel" aria-label="Question explanation" data-key="${esc(key(target))}"><header class="row spread"><h2>${esc(s.label)} · Q${q.number} · ${target.mode === "hint" ? "Hint" : "Explanation"}</h2><button data-ai="close" class="quiet" aria-label="Close explanation">Close</button></header>${screen === "results" ? `<details class="ai-question"><summary>Question</summary>${q.image ? `<img src="${esc(q.image)}" alt="Question ${q.number}">` : `<p>${esc(q.text || (q.sentences || []).join(" ") + "\n" + (q.prompt || ""))}</p>`}${q.options ? `<p>${q.options.map((column, i) => `Blank ${i + 1}: ${column.map((v, j) => `${letters(column.length)[j]}. ${esc(v)}`).join(" · ")}`).join("<br>")}</p>` : ""}${q.labels ? `<p>${q.labels.map((v, i) => `${letters(q.labels.length)[i]}. ${esc(v)}`).join("<br>")}</p>` : ""}</details>` : ""}<div id="ai-messages"></div><div id="ai-status" role="status"></div><form id="ai-followup" class="ai-followup"><textarea aria-label="Ask a follow-up" placeholder="Ask a follow-up…" rows="2" maxlength="8000">${esc(drafts.get(key(target)) || "")}</textarea><button class="primary" type="submit">Send</button></form></section>`;
+      slot.innerHTML = `<section id="ai-panel" class="ai-panel" aria-label="Question explanation" data-key="${esc(key(target))}"><header class="row spread"><h2>${q.task === "writing" ? "Writing" : `${esc(s.label)} · Q${q.number}`} · ${target.mode === "hint" ? "Hint" : q.task === "writing" ? "Feedback" : "Explanation"}</h2><button data-ai="close" class="quiet" aria-label="Close explanation">Close</button></header>${screen === "results" ? `<details class="ai-question"><summary>Question</summary>${q.image ? `<img src="${esc(q.image)}" alt="Question ${q.number}">` : `<p>${esc(q.text || (q.sentences || []).join(" ") + "\n" + (q.prompt || ""))}</p>`}${q.options ? `<p>${q.options.map((column, i) => `Blank ${i + 1}: ${column.map((v, j) => `${letters(column.length)[j]}. ${esc(v)}`).join(" · ")}`).join("<br>")}</p>` : ""}${q.task === "writing" ? `<h3>Your writing</h3><p>${esc(active.essay || "")}</p>` : ""}${q.labels ? `<p>${q.labels.map((v, i) => `${letters(q.labels.length)[i]}. ${esc(v)}`).join("<br>")}</p>` : ""}</details>` : ""}<div id="ai-messages"></div><div id="ai-status" role="status"></div>${q.task === "writing" && active.status !== "done" ? '<button data-ai="refresh-writing" class="quiet">Review current draft</button>' : ""}<form id="ai-followup" class="ai-followup"><textarea aria-label="Ask a follow-up" placeholder="Ask a follow-up…" rows="2" maxlength="8000">${esc(drafts.get(key(target)) || "")}</textarea><button class="primary" type="submit">Send</button></form></section>`;
       $("#ai-followup textarea").oninput = (e) =>
         drafts.set(key(target), e.target.value);
       $("#ai-followup").onsubmit = (e) => {
@@ -138,6 +157,8 @@ const AI = (() => {
         : !r?.messages.length
           ? '<button data-ai="retry">Explain</button>'
           : "";
+    if ($('[data-ai="refresh-writing"]'))
+      $('[data-ai="refresh-writing"]').disabled = pending;
     $("#ai-followup button").disabled = pending || !r?.messages.length;
     $("#ai-followup").hidden = !r?.messages.length;
   }
@@ -186,7 +207,7 @@ const AI = (() => {
   async function open(si, qi) {
     if (!allowed()) return;
     const a = active,
-      q = test().sections[si].questions[qi];
+      { q } = item(a, si, qi);
     target = {
       attempt: a.id,
       question: q.id,
@@ -216,6 +237,7 @@ const AI = (() => {
       key({
         attempt: a.id,
         question: request.question,
+        si,
         mode: selectedMode,
         language: request.language,
       }),
@@ -325,6 +347,18 @@ const AI = (() => {
       switch (button.dataset.ai) {
         case "open":
           await open(active.section, active.question);
+          break;
+        case "writing":
+          await open(-1, 0);
+          break;
+        case "refresh-writing":
+          await submit(
+            active,
+            -1,
+            0,
+            target.mode,
+            "Review the current draft supplied with this request. Identify what still needs improvement.",
+          );
           break;
         case "question":
           await open(...button.dataset.aiPosition.split(",").map(Number));

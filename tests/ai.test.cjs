@@ -29,3 +29,17 @@ test("hint requests omit keys and supplied explanations before leaving the brows
   assert.equal(full.key, "B");
   assert.equal(full.disputed, true);
 });
+
+test("writing context captures the current draft without a multiple-choice key", () => {
+  const q = {
+    id: "@writing",
+    task: "writing",
+    text: "Discuss parks",
+    key: "none",
+  };
+  const out = AI.context(q, {}, { essay: "My current draft" }, "full");
+  assert.equal(out.prompt, "Discuss parks");
+  assert.equal(out.response, "My current draft");
+  assert.equal(out.task, "writing");
+  assert.equal(Object.hasOwn(out, "key"), false);
+});

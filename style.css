@@ -1540,6 +1540,12 @@ dialog h2 {
   background: #f6f9f8;
   color: #193b40;
 }
+.essay-prompt .ai-panel {
+  font:
+    16px Arial,
+    Helvetica,
+    sans-serif;
+}
 .ai-panel h2 {
   margin: 0;
   font-size: 19px;

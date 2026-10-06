@@ -10,7 +10,7 @@ A general-purpose mock-test interface that runs locally in your browser. Plain J
 - Single/multiple choice, multi-blank, numeric, fraction, and sentence-selection answers
 - Mark and review, calculator, and typed/drawn scratchpad
 - Local autosave, filtered attempt history, bulk deletion, export, and answer-key scoring
-- Optional local Codex / Claude Code explanations, hints, and follow-up conversations
+- Optional local Codex / Claude Code explanations, writing feedback, hints, and follow-up conversations
 
 ## Run
 
@@ -38,15 +38,15 @@ Questions can use `text`, `labels`, and `options`, or an `image` path such as `a
 
 See the [explanation setup and usage guide](EXPLANATIONS.md) for a fresh-device walkthrough and troubleshooting.
 
-Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://code.claude.com/docs/en/quickstart) locally. In Settings → Explanations choose a channel, an optional model name, Chinese or English, and a preset prompt. Passage, question, and option quotations retain their original English wording. The CLI sends questions to its provider using your signed-in account; this is not offline inference. No API key is stored by this app.
+Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://code.claude.com/docs/en/quickstart) locally. In Settings → Explanations choose a channel, a High / Medium / Low model tier (default Medium), Chinese or English, and a preset prompt. Passage, question, and option quotations retain their original English wording. The CLI sends questions to its provider using your signed-in account; this is not offline inference. No API key is stored by this app.
 
-Results have **Explain** per question and **Explain all incorrect** for answered, incorrect questions. Unanswered and disputed questions can still be explained individually. Conversations and follow-ups appear inline. Jobs run one at a time and can be stopped or retried. Leaving a page does not stop a submitted job.
+Results have **Explain** per question and **Explain all incorrect** for answered, incorrect questions. Unanswered and disputed questions can still be explained individually. Writing tasks have **Review writing** for argument, structure, and language feedback, with **Review current draft** after edits. Conversations and follow-ups appear inline. Jobs run one at a time and can be stopped or retried. Leaving a page does not stop a submitted job.
 
 During attempts, explanations are **Off** by default. Choose **Hints only** or **Full explanations** to enable them. Hint requests omit the supplied answer key and prior full explanations; the model is instructed to avoid giving the answer. The timer keeps running.
 
 Conversations are saved separately per attempt, question, mode, and language in `.progress/explanations.json`. Deleting an attempt deletes its conversations and stops its jobs. Back up `.progress/` to include explanations; ordinary attempt JSON exports contain answers only. Interrupted jobs are marked for manual retry after a server restart.
 
-The adapters attach question images directly, use isolated temporary directories, and disable shell / connector access for the tutor. Claude Code integration is covered by protocol tests; a live run requires its local installation. Keep this feature branch on a separate port and copy of `.progress/` when experimenting.
+The adapters attach question images directly, use isolated temporary directories, and disable shell / connector access for the tutor. On macOS, the adapter also detects Claude Code bundled with Claude Desktop. Both providers need a valid local login. Keep this feature branch on a separate port and copy of `.progress/` when experimenting.
 
 ## Keep a local copy in sync
 

@@ -114,7 +114,7 @@ test("test preferences default to focus mode and preserve explicit opt-outs", ()
   assert.deepEqual(C.preferences(), {
     aiLanguage: "zh",
     aiProvider: "codex",
-    aiModel: "",
+    aiTier: "medium",
     aiDuring: "off",
     aiPrompt: C.preferences().aiPrompt,
     focusMode: true,
@@ -132,7 +132,7 @@ test("test preferences default to focus mode and preserve explicit opt-outs", ()
     {
       aiLanguage: "zh",
       aiProvider: "codex",
-      aiModel: "",
+      aiTier: "medium",
       aiDuring: "off",
       aiPrompt: C.preferences().aiPrompt,
       focusMode: false,
@@ -167,4 +167,11 @@ test("explanation language is explicit and preset prompts do not control it", ()
     "en",
   );
   assert.equal(C.preferences({ aiLanguage: "unknown" }).aiLanguage, "zh");
+});
+
+test("model presets replace manual names and default to Medium", () => {
+  assert.equal(C.preferences({ aiModel: "old-model" }).aiTier, "medium");
+  for (const tier of ["high", "medium", "low"])
+    assert.equal(C.preferences({ aiTier: tier }).aiTier, tier);
+  assert.equal(C.preferences({ aiTier: "bad" }).aiTier, "medium");
 });

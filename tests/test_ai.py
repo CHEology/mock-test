@@ -43,7 +43,7 @@ class TutorTests(unittest.TestCase):
             prompt = ai.tutor_prompt(request, [])
             self.assertIn('Write explanatory prose in ' + prose, prompt)
             self.assertIn('exact original English wording', prompt)
-            self.assertIn('Do not translate source wording', prompt)
+            self.assertIn('Do not translate or paraphrase the task, passage, options, or draft', prompt)
         with self.assertRaises(ValueError):
             ai.prepare(dict(self.request, language='fr'), self.root)
 
@@ -57,6 +57,43 @@ class TutorTests(unittest.TestCase):
         self.assertEqual({r['language'] for r in tutor.list('attempt-1')}, {'zh','en'})
         self.submit(tutor, language='en', followup='Why?'); tutor.jobs.join()
         self.assertEqual(len(seen[-1]), 2)
+
+    def test_writing_uses_a_separate_identity_and_new_draft_can_be_reviewed(self):
+        tutor = self.tutor()
+        self.submit(tutor, question='@writing'); tutor.jobs.join()
+        first = self.submit(tutor, question='@writing', context={'task':'writing','prompt':'Discuss public parks','response':'Draft one'})
+        tutor.jobs.join()
+        self.submit(tutor, question='@writing', context={'task':'writing','prompt':'Discuss public parks','response':'Draft two'})
+        tutor.jobs.join()
+        records = tutor.list('attempt-1')
+        self.assertEqual(len(records),2)
+        writing = next(r for r in records if r['kind']=='writing')
+        self.assertEqual(writing['id'],first)
+        self.assertEqual(len(writing['messages']),4)
+
+    def test_writing_prompts_match_mode_without_invented_scores(self):
+        base = dict(self.request, context={'task':'writing','prompt':'Discuss parks','response':'My draft','key':'fake'})
+        full = ai.prepare(base,self.root)
+        self.assertNotIn('key',full['context'])
+        self.assertIn('Do not invent a numeric or official score',ai.tutor_prompt(full,[]))
+        hint = ai.prepare(dict(base,mode='hint'),self.root)
+        self.assertIn('Do not write a replacement essay',ai.tutor_prompt(hint,[]))
+
+    def test_claude_desktop_cli_discovery_uses_latest_version(self):
+        base = self.root / 'Library/Application Support/Claude/claude-code'
+        for version in ('2.1.9','2.1.10'):
+            binary = base / version / 'build/claude.app/Contents/MacOS/claude'
+            binary.parent.mkdir(parents=True); binary.touch(); binary.chmod(0o755)
+        with patch('ai.Path.home',return_value=self.root), patch('ai.shutil.which',return_value=None):
+            self.assertIn('/2.1.10/', ai.executable('claude'))
+
+    def test_model_tiers_resolve_provider_presets_and_cache(self):
+        self.assertEqual([ai.model_tier('claude',t)['model'] for t in ('high','medium','low')],['opus','sonnet','haiku'])
+        with patch.dict('os.environ',{'CODEX_HOME':str(self.root)}):
+            self.assertEqual(ai.model_tier('codex','low'),{'model':'','effort':'low'})
+            (self.root/'models_cache.json').write_text(json.dumps({'models':[{'slug':'gpt-6-sol'},{'slug':'gpt-6.1-sol'},{'slug':'gpt-6-luna'},{'slug':'gpt-6-astra'}]}))
+            self.assertEqual(ai.model_tier('codex','medium')['model'],'gpt-6.1-sol')
+            self.assertEqual(ai.model_tier('codex','high')['model'],'gpt-6-astra')
 
     def test_saved_conversations_followups_and_attempts_are_separate(self):
         seen = []
@@ -126,13 +163,13 @@ class TutorTests(unittest.TestCase):
         tutor = self.tutor()
         with patch('ai.executable', return_value=None), self.assertRaisesRegex(ValueError, 'Install and sign in'):
             tutor.submit(self.request)
-        for extra in ({'model':'--unsafe command'}, {'mode':'invalid'}, {'context':{}}, {'provider':'bash'}):
+        for extra in ({'tier':'unknown'}, {'mode':'invalid'}, {'context':{}}, {'provider':'bash'}):
             with self.assertRaises(ValueError):
                 ai.prepare(dict(self.request, **extra), self.root)
 
 
 class CLITests(unittest.TestCase):
-    def run_fake(self, provider, response, image=False):
+    def run_fake(self, provider, response, image=False, exit_code=0):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             binary = root / 'tool'
@@ -140,7 +177,7 @@ class CLITests(unittest.TestCase):
             # Executable stub exercises stdin, image attachments, process handling and output parsing.
             binary.write_text('#!/usr/bin/env python3\nimport sys,json,pathlib\n'
                               f'pathlib.Path({str(capture)!r}).write_text(json.dumps([sys.argv[1:],sys.stdin.read()]))\n'
-                              + ('pathlib.Path(sys.argv[sys.argv.index("--output-last-message")+1]).write_text("Five")\n' if provider == 'codex' else f'print({json.dumps(response)!r})\n'))
+                              + ('pathlib.Path(sys.argv[sys.argv.index("--output-last-message")+1]).write_text("Five")\n' if provider == 'codex' else f'print({json.dumps(response)!r})\n') + f'sys.exit({exit_code})\n')
             binary.chmod(0o755)
             context = {'text':'2+3?'}
             if image: context['image'] = 'data:image/png;base64,aGVsbG8='
@@ -159,13 +196,19 @@ class CLITests(unittest.TestCase):
         self.assertIn('--ephemeral', args)
 
     def test_claude_multimodal_input_disables_tools(self):
-        reply, args, stdin = self.run_fake('claude', {'result':'Five'}, True)
+        reply, args, stdin = self.run_fake('claude', {'type':'result','result':'Five'}, True)
         self.assertEqual(reply, 'Five')
         self.assertEqual(args[args.index('--tools')+1], '')
+        self.assertEqual(args[args.index('--output-format')+1], 'stream-json')
+        self.assertIn('--verbose',args)
         blocks = json.loads(stdin)['message']['content']
         self.assertEqual(blocks[1]['type'], 'image')
         self.assertEqual(blocks[1]['source']['media_type'], 'image/png')
 
     def test_claude_errors_are_not_explanations(self):
         with self.assertRaisesRegex(RuntimeError, 'could not finish'):
-            self.run_fake('claude', {'is_error':True, 'result':'limit reached'})
+            self.run_fake('claude', {'type':'result','is_error':True, 'result':'limit reached'})
+
+    def test_claude_expired_login_nonzero_exit_is_actionable(self):
+        with self.assertRaisesRegex(RuntimeError, 'sign-in expired'):
+            self.run_fake('claude', {'type':'result','is_error':True, 'result':'Failed to authenticate: OAuth session expired and could not be refreshed'}, exit_code=1)

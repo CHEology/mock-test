@@ -136,8 +136,7 @@
     return {
       aiLanguage: value.aiLanguage === "en" ? "en" : "zh",
       aiProvider: value.aiProvider === "claude" ? "claude" : "codex",
-      aiModel:
-        typeof value.aiModel === "string" ? value.aiModel.slice(0, 100) : "",
+      aiTier: ["high", "low"].includes(value.aiTier) ? value.aiTier : "medium",
       aiPrompt:
         typeof value.aiPrompt === "string" &&
         value.aiPrompt !==
