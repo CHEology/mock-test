@@ -64,3 +64,35 @@ test("master switch hides every test-mode entry and skips provider discovery", a
   sandbox.settings.aiDuring = "hint";
   assert.match(AI.button(), /Hint/);
 });
+
+test("batch explanations include wrong and unanswered questions, excluding correct and disputed", () => {
+  sandbox.C = require("../core.js");
+  const q = (id, extra = {}) => ({
+    id,
+    type: "single",
+    count: 2,
+    key: "B",
+    ...extra,
+  });
+  const t = {
+    sections: [
+      {
+        questions: [
+          q("wrong"),
+          q("blank"),
+          q("correct"),
+          q("disputed", { disputed: true }),
+        ],
+      },
+    ],
+  };
+  const a = { answers: { wrong: "A", correct: "B", disputed: "A" } };
+  assert.equal(
+    JSON.stringify(AI.incorrectQuestions(t, a)),
+    JSON.stringify([
+      [0, 0],
+      [0, 1],
+    ]),
+  );
+  assert.equal(AI.incorrectQuestions(t, { answers: {} }).length, 3);
+});

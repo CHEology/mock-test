@@ -278,23 +278,20 @@ const AI = (() => {
       paint();
     }
   }
+  function incorrectQuestions(t, a) {
+    return t.sections.flatMap((s, si) =>
+      s.questions.flatMap((q, qi) =>
+        C.grade(q, a.answers[q.id]) === false ? [[si, qi]] : [],
+      ),
+    );
+  }
   async function explainWrong() {
     if (!settings.aiEnabled || !active || active.status !== "done" || batch)
       return;
     const a = active,
-      t = test(),
-      todo = [];
-    t.sections.forEach((s, si) =>
-      s.questions.forEach((q, qi) => {
-        if (
-          C.grade(q, a.answers[q.id]) === false &&
-          C.answered(q, a.answers[q.id])
-        )
-          todo.push([si, qi]);
-      }),
-    );
+      todo = incorrectQuestions(test(), a);
     if (!todo.length) {
-      notify("No incorrect answers to explain.");
+      notify("No incorrect or unanswered questions to explain.");
       return;
     }
     const token = { stop: false, attempt: a.id };
@@ -416,5 +413,5 @@ const AI = (() => {
     target = null;
     if (!settings.aiEnabled && batch) batch.stop = true;
   }
-  return { button, slot, mount, providers, context, reset };
+  return { button, slot, mount, providers, context, reset, incorrectQuestions };
 })();

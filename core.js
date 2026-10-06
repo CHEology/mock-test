@@ -109,7 +109,10 @@
       updated = Math.max(updated, state.updated || 0);
       for (const item of state.library || []) {
         const old = library.get(item.id);
-        if (!old || item.updated >= old.updated)
+        if (
+          !old ||
+          (!old.deleted && (item.deleted || item.updated >= old.updated))
+        )
           library.set(item.id, { ...item });
       }
       for (const [id, time] of Object.entries(state.deleted || {}))

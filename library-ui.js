@@ -74,7 +74,7 @@ function libraryShell(content, location) {
     )
     .join(
       "",
-    )}<div class="side-bottom"><button class="side-link ${screen === "history" && historyGroup === "all" ? "chosen" : ""}" data-action="history">Attempts</button><button class="side-link ${location === "trash" ? "chosen" : ""}" data-lib-open="trash">Trash</button><button class="side-link ${screen === "settings" ? "chosen" : ""}" data-action="settings">Settings</button><button class="side-link ${screen === "help" ? "chosen" : ""}" data-action="help">Help</button></div></nav></aside><main class="library-main ${screen === "history" ? "library-history" : ""}"><div class="library-topline"><nav class="breadcrumbs" aria-label="Breadcrumb"><button data-lib-open="all">Library</button>${category ? `<span>/</span><button data-lib-open="${esc(category.id)}" ${current?.kind === "category" ? 'aria-current="page"' : ""}>${esc(category.name)}</button>` : ""}${current?.kind === "folder" ? `<span>/</span><button data-lib-open="${esc(current.id)}" aria-current="page">${esc(current.name)}</button>` : ""}${location === "trash" ? '<span>/</span><span aria-current="page">Trash</span>' : ""}${["settings", "help"].includes(location) ? `<span>/</span><span aria-current="page">${location === "settings" ? "Settings" : "Help"}</span>` : ""}</nav></div>${content}</main></div>`;
+    )}<div class="side-bottom"><button class="side-link ${screen === "history" && historyGroup === "all" ? "chosen" : ""}" data-action="history">Attempts</button><button class="side-link ${screen === "settings" ? "chosen" : ""}" data-action="settings">Settings</button><button class="side-link ${screen === "help" ? "chosen" : ""}" data-action="help">Help</button></div></nav></aside><main class="library-main ${screen === "history" ? "library-history" : ""}"><div class="library-topline"><nav class="breadcrumbs" aria-label="Breadcrumb"><button data-lib-open="all">Library</button>${category ? `<span>/</span><button data-lib-open="${esc(category.id)}" ${current?.kind === "category" ? 'aria-current="page"' : ""}>${esc(category.name)}</button>` : ""}${current?.kind === "folder" ? `<span>/</span><button data-lib-open="${esc(current.id)}" aria-current="page">${esc(current.name)}</button>` : ""}${["settings", "help"].includes(location) ? `<span>/</span><span aria-current="page">${location === "settings" ? "Settings" : "Help"}</span>` : ""}</nav></div>${content}</main></div>`;
 }
 function libraryTabs(location, attempts = false) {
   const current = libItem(location);
@@ -156,33 +156,26 @@ document.addEventListener("pointerdown", (e) => {
 
 function renderLibrary() {
   closeLibraryMenu();
-  if (
-    !["all", "trash"].includes(libraryLocation) &&
-    !libVisible(libItem(libraryLocation))
-  )
+  if (libraryLocation !== "all" && !libVisible(libItem(libraryLocation)))
     libraryLocation = "all";
   try {
     sessionStorage.setItem("mock-library-location", libraryLocation);
   } catch (_) {}
   const current = libItem(libraryLocation);
-  let items =
-    libraryLocation === "trash"
-      ? db.library.filter((r) => r.trashed)
-      : db.library.filter(
-          (r) =>
-            libVisible(r) &&
-            (libraryLocation === "all"
-              ? r.kind === "category"
-              : r.parent === libraryLocation),
-        );
+  let items = db.library.filter(
+    (r) =>
+      libVisible(r) &&
+      (libraryLocation === "all"
+        ? r.kind === "category"
+        : r.parent === libraryLocation),
+  );
   if (libraryQuery.trim()) {
     const query = libraryQuery.trim().toLowerCase();
     items = db.library.filter(
       (r) =>
-        (libraryLocation === "trash" ? r.trashed : libVisible(r)) &&
+        libVisible(r) &&
         r.name.toLowerCase().includes(query) &&
         (libraryLocation === "all" ||
-          libraryLocation === "trash" ||
           r.parent === libraryLocation ||
           (current?.kind === "category" &&
             libItem(r.parent)?.parent === libraryLocation)),
@@ -194,14 +187,9 @@ function renderLibrary() {
   librarySelection = new Set(
     [...librarySelection].filter((id) => items.some((r) => r.id === id)),
   );
-  const title =
-    libraryLocation === "all"
-      ? "Library"
-      : libraryLocation === "trash"
-        ? "Trash"
-        : current.name;
+  const title = libraryLocation === "all" ? "Library" : current.name;
   app.innerHTML = libraryShell(
-    `<header class="library-heading row spread"><h1>${esc(title)}</h1><div class="row">${current ? libraryMenu(current) : ""}${libraryLocation === "all" ? '<button class="primary" data-lib-new="category">+ Category</button>' : current?.kind === "category" ? '<button data-lib-new="folder">+ Folder</button><button class="primary" data-lib-add>Add test</button>' : current?.kind === "folder" ? '<button class="primary" data-lib-add>Add test</button>' : ""}</div></header>${libraryTabs(libraryLocation)}<div class="library-tools row spread"><input type="search" id="library-search" aria-label="Search library" placeholder="Search${current ? " in " + esc(current.name) : ""}" value="${esc(libraryQuery)}"><div class="row" id="library-selection-actions">${librarySelectionHTML()}</div></div><div class="library-items ${items.every((r) => r.kind === "category" || r.kind === "folder") && items.length ? "folder-grid" : "file-list"}">${items.map((r) => libraryItemHTML(r)).join("") || `<div class="library-empty">${libraryQuery ? "No matches." : libraryLocation === "trash" ? "Trash is empty." : current?.kind === "folder" ? "No tests yet." : libraryLocation === "all" ? "No categories yet." : "No items yet."}</div>`}</div>`,
+    `<header class="library-heading row spread"><h1>${esc(title)}</h1><div class="row">${current ? libraryMenu(current) : ""}${libraryLocation === "all" ? '<button class="primary" data-lib-new="category">+ Category</button>' : current?.kind === "category" ? '<button data-lib-new="folder">+ Folder</button><button class="primary" data-lib-add>Add test</button>' : current?.kind === "folder" ? '<button class="primary" data-lib-add>Add test</button>' : ""}</div></header>${libraryTabs(libraryLocation)}<div class="library-tools row spread"><input type="search" id="library-search" aria-label="Search library" placeholder="Search${current ? " in " + esc(current.name) : ""}" value="${esc(libraryQuery)}"><div class="row" id="library-selection-actions">${librarySelectionHTML()}</div></div><div class="library-items ${items.every((r) => r.kind === "category" || r.kind === "folder") && items.length ? "folder-grid" : "file-list"}">${items.map((r) => libraryItemHTML(r)).join("") || `<div class="library-empty">${libraryQuery ? "No matches." : current?.kind === "folder" ? "No tests yet." : libraryLocation === "all" ? "No categories yet." : "No items yet."}</div>`}</div>`,
     libraryLocation,
   );
 }
@@ -210,8 +198,7 @@ function librarySelectionHTML() {
   return `<span>${librarySelection.size} selected</span>`;
 }
 function libraryItemHTML(r) {
-  const trashed = libraryLocation === "trash",
-    isTest = r.kind === "test";
+  const isTest = r.kind === "test";
   const t = isTest ? DATA.find((t) => t.id === r.testId) : null;
   const attempts = isTest ? db.attempts.filter((a) => a.test === r.testId) : [];
   const open = attempts.findLast((a) => a.status !== "done"),
@@ -223,7 +210,7 @@ function libraryItemHTML(r) {
         ? `Latest ${attemptScore(last)}`
         : "Writing saved"
       : "";
-  return `<article class="library-item ${isTest ? "test-file" : "folder-card"} ${librarySelection.has(r.id) ? "selected" : ""}" data-lib-item="${esc(r.id)}" tabindex="0" aria-label="${esc(r.name)}" aria-selected="${librarySelection.has(r.id)}"><div class="item-icon ${r.kind}">${libIcon(r.kind)}</div><div class="item-title">${isTest || trashed ? `<h2>${esc(r.name)}</h2>` : `<button class="folder-open" data-lib-open="${esc(r.id)}">${esc(r.name)}</button>`}${(trashed || libraryQuery) && libraryPath(r) ? `<span class="muted">${esc(libraryPath(r))}</span>` : status ? `<span class="muted">${esc(status)}</span>` : ""}</div><div class="item-actions row">${!trashed && isTest && t ? `${attempts.length ? `<button class="quiet" data-history="${r.testId}">${attempts.length} ${attempts.length === 1 ? "attempt" : "attempts"}</button>` : ""}${open ? `<button class="primary" data-resume="${open.id}">Resume</button>` : `<button class="primary" data-start="${r.testId}">${last ? "Try again" : "Start"}</button>`}` : ""}${libraryMenu(r)}</div></article>`;
+  return `<article class="library-item ${isTest ? "test-file" : "folder-card"} ${librarySelection.has(r.id) ? "selected" : ""}" data-lib-item="${esc(r.id)}" tabindex="0" aria-label="${esc(r.name)}" aria-selected="${librarySelection.has(r.id)}"><div class="item-icon ${r.kind}">${libIcon(r.kind)}</div><div class="item-title">${isTest ? `<h2>${esc(r.name)}</h2>` : `<button class="folder-open" data-lib-open="${esc(r.id)}">${esc(r.name)}</button>`}${libraryQuery && libraryPath(r) ? `<span class="muted">${esc(libraryPath(r))}</span>` : status ? `<span class="muted">${esc(status)}</span>` : ""}</div><div class="item-actions row">${isTest && t ? `${attempts.length ? `<button class="quiet" data-history="${r.testId}">${attempts.length} ${attempts.length === 1 ? "attempt" : "attempts"}</button>` : ""}${open ? `<button class="primary" data-resume="${open.id}">Resume</button>` : `<button class="primary" data-start="${r.testId}">${last ? "Try again" : "Start"}</button>`}` : ""}${libraryMenu(r)}</div></article>`;
 }
 function libraryNameDialog(kind, id) {
   const item = id ? libItem(id) : null;
@@ -257,7 +244,7 @@ function libraryNameDialog(kind, id) {
         name,
         parent,
         updated: Date.now(),
-        trashed: false,
+        deleted: false,
       };
       db.library.push(created);
       libraryLocation = created.id;
@@ -275,22 +262,13 @@ function libraryItemMenu(id, anchor) {
     );
     libraryContextMenu(
       anchor,
-      libraryLocation === "trash"
-        ? `<button role="menuitem" data-lib-bulk="restore">Restore ${count} items</button>`
-        : `${canMove ? `<button role="menuitem" data-lib-bulk="move">Move ${count} items…</button>` : ""}<button role="menuitem" class="danger" data-lib-bulk="trash">Move ${count} items to Trash</button><button role="menuitem" data-lib-bulk="clear">Clear selection</button>`,
-    );
-    return;
-  }
-  if (libraryLocation === "trash") {
-    libraryContextMenu(
-      anchor,
-      `<button role="menuitem" data-lib-restore="${esc(id)}">Restore</button>`,
+      `${canMove ? `<button role="menuitem" data-lib-bulk="move">Move ${count} items…</button>` : ""}<button role="menuitem" class="danger" data-lib-bulk="delete">Delete ${count} items…</button><button role="menuitem" data-lib-bulk="clear">Clear selection</button>`,
     );
     return;
   }
   libraryContextMenu(
     anchor,
-    `<button role="menuitem" data-lib-rename="${esc(id)}">Rename</button>${r.kind !== "category" ? `<button role="menuitem" data-lib-move="${esc(id)}">Move to…</button>` : ""}${r.kind === "test" ? `<button role="menuitem" data-lib-copy="${esc(id)}">Create a copy or practice…</button><button role="menuitem" data-lib-export="${esc(id)}">Export test</button>` : ""}<button role="menuitem" class="danger" data-lib-trash="${esc(id)}">Move to Trash</button>`,
+    `<button role="menuitem" data-lib-rename="${esc(id)}">Rename</button>${r.kind !== "category" ? `<button role="menuitem" data-lib-move="${esc(id)}">Move to…</button>` : ""}${r.kind === "test" ? `<button role="menuitem" data-lib-copy="${esc(id)}">Create a copy or practice…</button><button role="menuitem" data-lib-export="${esc(id)}">Export test</button>` : ""}<button role="menuitem" class="danger" data-lib-delete="${esc(id)}">Delete…</button>`,
   );
 }
 function libraryMoveDialog(ids) {
@@ -322,15 +300,21 @@ function libraryMoveDialog(ids) {
     libraryCommit();
   };
 }
-function libraryTrash(ids) {
-  db.library = L.trash(db.library, ids);
-  libraryCommit();
-  notify("Moved to Trash.");
-}
-function libraryRestore(ids) {
-  db.library = L.restore(db.library, ids);
-  libraryCommit();
-  notify("Restored.");
+function libraryDeleteDialog(ids) {
+  const items = ids.map(libItem).filter((r) => r && libVisible(r));
+  if (!items.length) return;
+  closeLibraryMenu();
+  dialog(
+    `<h2>Delete ${items.length === 1 ? esc(items[0].name) : `${items.length} items`}?</h2><p>${items.some((r) => r.kind !== "test") ? "Everything inside will also be removed. " : ""}This cannot be undone. Saved attempts will be kept.</p><div class="dialog-actions"><button data-action="close">Cancel</button><button class="danger" id="confirm-library-delete">Delete</button></div>`,
+  );
+  $("#confirm-library-delete").onclick = () => {
+    db.library = L.remove(
+      db.library,
+      items.map((r) => r.id),
+    );
+    libraryCommit();
+    notify("Deleted.");
+  };
 }
 function addLibraryTest(content, name, parent) {
   let id = Date.now();
@@ -347,7 +331,7 @@ function addLibraryTest(content, name, parent) {
     testId: id,
     content: { ...content, id },
     updated: Date.now(),
-    trashed: false,
+    deleted: false,
   });
 }
 function libraryAddDialog(anchor) {
@@ -522,16 +506,14 @@ document.addEventListener("click", (e) => {
   else if (b.dataset.libRename)
     libraryNameDialog(libItem(b.dataset.libRename).kind, b.dataset.libRename);
   else if (b.dataset.libMove) libraryMoveDialog([b.dataset.libMove]);
-  else if (b.dataset.libTrash) libraryTrash([b.dataset.libTrash]);
-  else if (b.dataset.libRestore) libraryRestore([b.dataset.libRestore]);
+  else if (b.dataset.libDelete) libraryDeleteDialog([b.dataset.libDelete]);
   else if (b.dataset.libCopy) libraryCopyDialog(b.dataset.libCopy);
   else if (b.dataset.libExport) libraryExport(b.dataset.libExport);
   else if (b.hasAttribute("data-lib-add")) libraryAddDialog(b);
   else if (b.dataset.libBulk) {
     const ids = [...librarySelection];
     if (b.dataset.libBulk === "move") libraryMoveDialog(ids);
-    else if (b.dataset.libBulk === "trash") libraryTrash(ids);
-    else if (b.dataset.libBulk === "restore") libraryRestore(ids);
+    else if (b.dataset.libBulk === "delete") libraryDeleteDialog(ids);
     else {
       librarySelection.clear();
       renderHome();
@@ -882,7 +864,6 @@ function openLibraryCard(target) {
   const item = row && libItem(row.dataset.libItem);
   if (
     screen !== "home" ||
-    libraryLocation === "trash" ||
     !item ||
     !["folder", "category"].includes(item.kind) ||
     !libVisible(item)

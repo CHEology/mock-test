@@ -43,11 +43,12 @@ def merge_state(existing, incoming):
             if (not isinstance(item, dict) or not isinstance(item.get('id'), str)
                     or item.get('kind') not in ('category', 'folder', 'test')
                     or not isinstance(item.get('name'), str)
-                    or not isinstance(item.get('trashed', False), bool)):
+                    or not isinstance(item.get('trashed', False), bool)
+                    or not isinstance(item.get('deleted', False), bool)):
                 raise ValueError('Invalid library item')
             timestamp(item.get('updated', 0))
             old = library.get(item['id'])
-            if old is None or item.get('updated', 0) >= old.get('updated', 0):
+            if old is None or (not old.get('deleted') and (item.get('deleted') or item.get('updated', 0) >= old.get('updated', 0))):
                 library[item['id']] = item
         removals = state.get('deleted', {})
         if not isinstance(removals, dict):

@@ -3,7 +3,7 @@
 A general-purpose mock-test interface that runs locally in your browser. Plain JavaScript, CSS, and a Python standard-library server; no build step. Core practice needs no account.
 
 - Two-level library: categories and folders, with scoped attempt tabs and a collapsible sidebar
-- Anchored action menus, in-page editing, box selection, drag-to-move, and recoverable Trash
+- Anchored action menus, in-page editing, box selection, drag-to-move, and confirmed deletion
 - Writing-task creation, section-specific practice copies, and JSON import/export
 - Full-screen focus mode by default, with a per-test opt-out and saved Settings
 - Configurable sections, timing, and optional writing tasks
@@ -24,11 +24,11 @@ This starts the local server and opens **http://127.0.0.1:17654** in Chrome on m
 
 The sidebar can stay pinned or auto-hide: move to the left edge to reveal it, move away to hide it, and use its corner button to pin it again. Help and Settings open in the main content area. Settings changes apply and save immediately across open tabs. Timer visibility and sidebar changes also update active views; test mode and writing defaults apply to new attempts. Settings controls default focus mode, timed/untimed mode, writing, timer visibility, and the sidebar. Focus mode uses the browser’s Fullscreen API: Esc or **Exit focus** returns to the normal window, and finishing or leaving a test exits automatically. Browser permission restrictions may prevent automatic full screen; the test still starts. Preferences are saved in this browser.
 
-Drag a rectangle in any direction across empty space, including blank row space, to select items. Drag names, icons, or an already-selected group to move items. Clicking an item does not select it. Click elsewhere in the interface or press Escape to clear selection. Open any selected item’s “…” menu to move or trash the selected group. Drag tests and folders onto destinations in the page, breadcrumbs, or sidebar. Hold over a directory to open it during a drag; the left edge reveals the auto-hidden sidebar. Tests can live directly in a category or inside its folders.
+Drag a rectangle in any direction across empty space, including blank row space, to select items. Drag names, icons, or an already-selected group to move items. Clicking an item does not select it. Click elsewhere in the interface or press Escape to clear selection. Open any selected item’s “…” menu to move or delete the selected group. Drag tests and folders onto destinations in the page, breadcrumbs, or sidebar. Hold over a directory to open it during a drag; the left edge reveals the auto-hidden sidebar. Tests can live directly in a category or inside its folders.
 
 ## Add your questions
 
-Use **Add test** inside a folder to create a writing task or import JSON tests. The import dialog includes an example file. Exported tests embed their images and can be imported on another installation. **Create a copy or practice** lets you select sections from an existing test. Trash preserves tests and their attempts until restored.
+Use **Add test** inside a folder to create a writing task or import JSON tests. The import dialog includes an example file. Exported tests embed their images and can be imported on another installation. **Create a copy or practice** lets you select sections from an existing test. Deleting a test, folder, or category requires a confirmation dialog. Deleting a folder or category also removes its contents from the library. Saved attempts and their question content remain available in Attempts. There is no Trash or Restore action.
 
 The included demo has 10 original example questions. Create `data.js` using [data.demo.js](data.demo.js) as the template. Configure each section's `label`, `minutes`, and `calculator`; add `essay` and `essayMinutes` for an optional writing task. Any number of sections is supported. Keep numeric test IDs and question IDs unique and stable.
 
@@ -42,7 +42,7 @@ Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or 
 
 The **Explanations** master switch in Settings defaults to on. Switching it off hides all tutor controls and its detailed settings immediately, while preserving saved conversations and preferences.
 
-Results have **Explain** per question and **Explain all incorrect** for answered, incorrect questions. Unanswered and disputed questions can still be explained individually. Writing tasks have **Review writing** for argument, structure, and language feedback, with **Review current draft** after edits. Conversations and follow-ups appear inline. Jobs run one at a time and can be stopped or retried. Leaving a page does not stop a submitted job.
+Results have **Explain** per question and **Explain incorrect & unanswered** for wrong and unanswered questions. Disputed questions can still be explained individually. Writing tasks have **Review writing** for argument, structure, and language feedback, with **Review current draft** after edits. Conversations and follow-ups appear inline. Jobs run one at a time and can be stopped or retried. Leaving a page does not stop a submitted job.
 
 During attempts, explanations are **Off** by default. Choose **Hints only** or **Full explanations** to enable them. Hint requests omit the supplied answer key and prior full explanations; the model is instructed to avoid giving the answer. The timer keeps running.
 

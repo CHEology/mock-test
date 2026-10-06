@@ -109,6 +109,13 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(saved['library'][0]['trashed'])
         self.assertEqual(saved['attempts'][0]['answers'],{'q':'A'})
 
+    def test_library_deletion_survives_newer_stale_writes(self):
+        base = {'id':'test-1','kind':'test','name':'Example','testId':1,'updated':10}
+        self.request('/api/state', {'version':1,'attempts':[], 'library':[dict(base,deleted=True,updated=20)]})
+        self.request('/api/state', {'version':1,'attempts':[], 'library':[dict(base,updated=999)]})
+        saved=json.loads(self.request('/api/state'))
+        self.assertTrue(saved['library'][0]['deleted'])
+
     def test_invalid_library_does_not_replace_saved_state(self):
         state={'version':1,'attempts':[],'library':[{'id':'cat','kind':'category','name':'Practice','updated':1}]}
         self.request('/api/state',state)

@@ -5,7 +5,7 @@
       ids = new Set(result.map((r) => r.id));
     const add = (r) => {
       if (!ids.has(r.id)) {
-        result.push({ ...r, updated: 0, trashed: false });
+        result.push({ ...r, updated: 0, deleted: false });
         ids.add(r.id);
       }
     };
@@ -40,7 +40,7 @@
   function visible(records, item) {
     const seen = new Set();
     while (item) {
-      if (item.trashed || seen.has(item.id)) return false;
+      if (item.deleted || item.trashed || seen.has(item.id)) return false;
       seen.add(item.id);
       if (!item.parent) return item.kind === "category";
       item = records.find((r) => r.id === item.parent);
@@ -71,24 +71,16 @@
       ids.includes(r.id) ? { ...r, parent, updated: now } : r,
     );
   }
-  function trash(records, ids, now = Date.now()) {
+  function remove(records, ids, now = Date.now()) {
+    const removed = new Set(ids);
+    let size;
+    do {
+      size = removed.size;
+      for (const r of records) if (removed.has(r.parent)) removed.add(r.id);
+    } while (removed.size !== size);
+    // Keep tombstones and question content for synchronization and saved attempts.
     return records.map((r) =>
-      ids.includes(r.id) ? { ...r, trashed: true, updated: now } : r,
-    );
-  }
-  function restore(records, ids, now = Date.now()) {
-    const restoreIds = new Set(ids);
-    for (const id of ids) {
-      let item = records.find((r) => r.id === id);
-      const seen = new Set();
-      while (item?.parent && !seen.has(item.id)) {
-        seen.add(item.id);
-        restoreIds.add(item.parent);
-        item = records.find((r) => r.id === item.parent);
-      }
-    }
-    return records.map((r) =>
-      restoreIds.has(r.id) ? { ...r, trashed: false, updated: now } : r,
+      removed.has(r.id) ? { ...r, deleted: true, updated: now } : r,
     );
   }
   function validateTest(input) {
@@ -220,8 +212,7 @@
     seed,
     visible,
     move,
-    trash,
-    restore,
+    remove,
     validateTest,
   };
   if (typeof module !== "undefined") module.exports = root.MockTestLibrary;
