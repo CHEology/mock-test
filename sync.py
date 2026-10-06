@@ -10,8 +10,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parent
 CONFIG = ROOT / 'local-config.json'
-SHARED = ('index.html', 'style.css', 'app.js', 'core.js', 'icon.svg',
-          'data.demo.js', 'library.js', 'library-ui.js', 'server.py', 'launch.py')
+SHARED = ('README.md', 'EXPLANATIONS.md', 'index.html', 'style.css', 'app.js', 'core.js', 'icon.svg',
+          'data.demo.js', 'ai.js', 'ai.py', 'library.js', 'library-ui.js', 'server.py', 'launch.py')
 
 def sync(destination):
     destination = Path(destination).expanduser().resolve()

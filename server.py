@@ -3,16 +3,25 @@
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from threading import Lock
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 import json
 import math
+import signal
 import os
 import tempfile
+import ai
 
 ROOT = Path(__file__).resolve().parent
 STATE = ROOT / '.progress' / 'progress.json'
 LOCK = Lock()
 PORT = int(os.environ.get('MOCK_TEST_PORT', '17654'))
+TUTOR = None
+
+def tutor():
+    global TUTOR
+    if TUTOR is None:
+        TUTOR = ai.Tutor(ROOT)
+    return TUTOR
 
 
 def timestamp(value):
@@ -92,6 +101,19 @@ class Handler(SimpleHTTPRequestHandler):
         if not self.valid_host():
             return self.send_error(403)
         path = urlsplit(self.path).path
+        if path.startswith('/api/ai/'):
+            if not self.valid_origin():
+                return self.send_error(403)
+            try:
+                with LOCK:
+                    if path == '/api/ai/providers':
+                        return self.send_json({p: bool(ai.executable(p)) for p in ('codex', 'claude')})
+                    if path == '/api/ai/conversations':
+                        attempt = parse_qs(urlsplit(self.path).query).get('attempt', [''])[0]
+                        return self.send_json(tutor().list(attempt))
+                return self.send_error(404)
+            except (OSError, ValueError):
+                return self.send_json({'error': 'Cannot read saved explanations'}, 500)
         if path == '/api/health':
             return self.send_json({'app': 'mock-test', 'version': 1})
         if path == '/api/state':
@@ -104,9 +126,42 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/data.js' and not (ROOT / 'data.js').exists():
             self.path = '/data.demo.js'
             return super().do_GET()
-        if path not in ['/', '/index.html', '/app.js', '/core.js', '/library.js', '/library-ui.js', '/data.js', '/style.css', '/icon.svg'] and not (path.startswith('/assets/') and path.endswith('.webp') and '..' not in path):
+        if path not in ['/', '/index.html', '/app.js', '/core.js', '/library.js', '/library-ui.js', '/ai.js', '/data.js', '/style.css', '/icon.svg'] and not (path.startswith('/assets/') and path.endswith('.webp') and '..' not in path):
             return self.send_error(404)
         return super().do_GET()
+
+    def valid_origin(self):
+        return (self.headers.get('Origin') in [None, f'http://127.0.0.1:{PORT}', f'http://localhost:{PORT}']
+                and self.headers.get('Sec-Fetch-Site') not in ('cross-site',))
+
+    def do_POST(self):
+        if not self.valid_host() or not self.valid_origin():
+            return self.send_error(403)
+        if self.path not in ('/api/ai/explain', '/api/ai/stop'):
+            return self.send_error(404)
+        if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
+            return self.send_error(415)
+        try:
+            length = int(self.headers.get('Content-Length', '0'))
+            if not 0 < length <= 15_000_000:
+                raise ValueError('Invalid request size')
+            value = json.loads(self.rfile.read(length))
+            if not isinstance(value, dict):
+                raise ValueError('Invalid request')
+            with LOCK:
+                state = json.loads(STATE.read_text()) if STATE.exists() else {}
+                attempt = value.get('attempt')
+                if not any(a['id'] == attempt for a in state.get('attempts', [])) or attempt in state.get('deleted', {}):
+                    return self.send_json({'error': 'Save this attempt before requesting an explanation'}, 409)
+                if self.path == '/api/ai/stop':
+                    tutor().stop(attempt, value.get('id'))
+                    return self.send_json({'stopped': True})
+                identity = tutor().submit(value)
+            return self.send_json({'id': identity}, 202)
+        except (ValueError, TypeError, AttributeError) as exc:
+            return self.send_json({'error': str(exc) or 'Invalid request'}, 400)
+        except OSError:
+            return self.send_json({'error': 'Cannot save explanations'}, 500)
 
     def do_PUT(self):
         if self.path != '/api/state' or not self.valid_host():
@@ -135,10 +190,26 @@ class Handler(SimpleHTTPRequestHandler):
                     os.fsync(stream.fileno())
                     temporary = stream.name
                 os.replace(temporary, STATE)
+                if TUTOR is not None or (ROOT / '.progress' / 'explanations.json').exists():
+                    tutor()
+                    for identity in state['deleted']:
+                        if TUTOR.list(identity):
+                            TUTOR.stop(identity, remove=True)
             except OSError:
                 return self.send_json({'error': 'Unable to save'}, 500)
         self.send_json({'saved': True, 'state': state})
 
 
 if __name__ == '__main__':
-    ThreadingHTTPServer(('127.0.0.1', PORT), Handler).serve_forever()
+    def stop_server(*_):
+        raise KeyboardInterrupt()
+    signal.signal(signal.SIGTERM, stop_server)
+    httpd = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        httpd.server_close()
+        if TUTOR is not None:
+            TUTOR.close()

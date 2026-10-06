@@ -1,6 +1,6 @@
 # Mock Test
 
-A general-purpose mock-test interface that runs locally in your browser. Plain JavaScript, CSS, and a Python standard-library server; no account or build step.
+A general-purpose mock-test interface that runs locally in your browser. Plain JavaScript, CSS, and a Python standard-library server; no build step. Core practice needs no account.
 
 - Two-level library: categories and folders, with scoped attempt tabs and a collapsible sidebar
 - Anchored action menus, in-page editing, box selection, drag-to-move, and recoverable Trash
@@ -10,10 +10,11 @@ A general-purpose mock-test interface that runs locally in your browser. Plain J
 - Single/multiple choice, multi-blank, numeric, fraction, and sentence-selection answers
 - Mark and review, calculator, and typed/drawn scratchpad
 - Local autosave, filtered attempt history, bulk deletion, export, and answer-key scoring
+- Optional local Codex / Claude Code explanations, hints, and follow-up conversations
 
 ## Run
 
-Requires Python 3 and a modern browser.
+Requires Python 3.9+ and a modern browser.
 
 ```sh
 python3 launch.py
@@ -32,6 +33,20 @@ Use **Add test** inside a folder to create a writing task or import JSON tests. 
 The included demo has 10 original example questions. Create `data.js` using [data.demo.js](data.demo.js) as the template. Configure each section's `label`, `minutes`, and `calculator`; add `essay` and `essayMinutes` for an optional writing task. Any number of sections is supported. Keep numeric test IDs and question IDs unique and stable.
 
 Questions can use `text`, `labels`, and `options`, or an `image` path such as `assets/01-01.webp`. `data.js`, `assets/`, and attempts in `.progress/` stay outside Git. Results report accuracy against the supplied key; writing responses are saved without automatic grading.
+
+## Explanations (experimental)
+
+See the [explanation setup and usage guide](EXPLANATIONS.md) for a fresh-device walkthrough and troubleshooting.
+
+Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://code.claude.com/docs/en/quickstart) locally. In Settings → Explanations choose a channel, an optional model name, Chinese or English, and a preset prompt. Passage, question, and option quotations retain their original English wording. The CLI sends questions to its provider using your signed-in account; this is not offline inference. No API key is stored by this app.
+
+Results have **Explain** per question and **Explain all incorrect** for answered, incorrect questions. Unanswered and disputed questions can still be explained individually. Conversations and follow-ups appear inline. Jobs run one at a time and can be stopped or retried. Leaving a page does not stop a submitted job.
+
+During attempts, explanations are **Off** by default. Choose **Hints only** or **Full explanations** to enable them. Hint requests omit the supplied answer key and prior full explanations; the model is instructed to avoid giving the answer. The timer keeps running.
+
+Conversations are saved separately per attempt, question, mode, and language in `.progress/explanations.json`. Deleting an attempt deletes its conversations and stops its jobs. Back up `.progress/` to include explanations; ordinary attempt JSON exports contain answers only. Interrupted jobs are marked for manual retry after a server restart.
+
+The adapters attach question images directly, use isolated temporary directories, and disable shell / connector access for the tutor. Claude Code integration is covered by protocol tests; a live run requires its local installation. Keep this feature branch on a separate port and copy of `.progress/` when experimenting.
 
 ## Keep a local copy in sync
 

@@ -134,6 +134,19 @@
   function preferences(value = {}) {
     if (!value || typeof value !== "object") value = {};
     return {
+      aiLanguage: value.aiLanguage === "en" ? "en" : "zh",
+      aiProvider: value.aiProvider === "claude" ? "claude" : "codex",
+      aiModel:
+        typeof value.aiModel === "string" ? value.aiModel.slice(0, 100) : "",
+      aiPrompt:
+        typeof value.aiPrompt === "string" &&
+        value.aiPrompt !==
+          "用中文简洁解释思路与关键步骤，说明各选项为什么对或错。独立核验题目；若答案表有误或材料不完整，明确指出，不要猜测。"
+          ? value.aiPrompt.slice(0, 8000)
+          : "Explain the reasoning and key steps concisely, including why each option is right or wrong. Check the question independently; flag a questionable key or missing context.",
+      aiDuring: ["hint", "full"].includes(value.aiDuring)
+        ? value.aiDuring
+        : "off",
       focusMode: typeof value.focusMode === "boolean" ? value.focusMode : true,
       mode: value.mode === "practice" ? "practice" : "timed",
       includeWriting:

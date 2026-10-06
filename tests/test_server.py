@@ -4,6 +4,8 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
+import ai
 import urllib.error
 import urllib.request
 
@@ -29,6 +31,9 @@ class ServerTests(unittest.TestCase):
         cls.httpd.shutdown()
         cls.httpd.server_close()
         cls.thread.join()
+        if server.TUTOR is not None:
+            server.TUTOR.close()
+            server.TUTOR = None
         cls.tmp.cleanup()
 
     def setUp(self):
@@ -111,3 +116,43 @@ class ServerTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError):
                 self.request('/api/state',dict(state,library=records))
         self.assertEqual(json.loads(self.request('/api/state'))['library'],state['library'])
+
+    def post(self, path, value, **headers):
+        request = urllib.request.Request(self.url + path, json.dumps(value).encode(),
+            headers={'Content-Type':'application/json', **headers}, method='POST')
+        with urllib.request.urlopen(request) as response:
+            return json.load(response)
+
+    def test_ai_rejects_cross_site_requests_and_deleted_attempts(self):
+        value = dict(attempt='a', question='q', mode='full', provider='codex', context={'text':'2+3?'})
+        for headers in ({'Origin':'https://example.com'}, {'Sec-Fetch-Site':'cross-site'}, {'Host':'bad.example'}):
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                self.post('/api/ai/explain', value, **headers)
+            self.assertEqual(error.exception.code, 403)
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.post('/api/ai/explain', value)
+        self.assertEqual(error.exception.code, 409)
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.post('/api/ai/explain', value, **{'Content-Type':'text/plain'})
+        self.assertEqual(error.exception.code, 415)
+
+    def test_ai_conversation_survives_state_save_and_is_removed_with_attempt(self):
+        if server.TUTOR: server.TUTOR.close()
+        server.TUTOR = ai.Tutor(server.ROOT, lambda *_: 'Five')
+        self.request('/api/state', {'version':1,'attempts':[{'id':'explain-a','answers':{'q':'A'}}]})
+        value = dict(attempt='explain-a', question='q', mode='full', provider='codex', context={'text':'2+3?','key':'B'})
+        with patch('ai.executable', return_value='/fake/codex'):
+            self.post('/api/ai/explain', value)
+        server.TUTOR.jobs.join()
+        self.request('/api/state', {'version':1,'attempts':[{'id':'explain-a','answers':{'q':'B'}}]})
+        records = json.loads(self.request('/api/ai/conversations?attempt=explain-a'))
+        self.assertEqual(records[0]['messages'][-1]['text'], 'Five')
+        self.request('/api/state', {'version':1,'attempts':[],'deleted':{'explain-a':123}})
+        self.assertEqual(json.loads(self.request('/api/ai/conversations?attempt=explain-a')), [])
+        self.assertEqual(json.loads(server.TUTOR.path.read_text()), {})
+
+    def test_ai_storage_is_not_a_static_download(self):
+        for path in ('/ai.py', '/.progress/explanations.json'):
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                self.request(path)
+            self.assertEqual(error.exception.code, 404)

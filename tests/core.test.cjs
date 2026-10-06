@@ -112,6 +112,11 @@ test("state merging keeps independent attempts and the newest revision", () => {
 
 test("test preferences default to focus mode and preserve explicit opt-outs", () => {
   assert.deepEqual(C.preferences(), {
+    aiLanguage: "zh",
+    aiProvider: "codex",
+    aiModel: "",
+    aiDuring: "off",
+    aiPrompt: C.preferences().aiPrompt,
     focusMode: true,
     mode: "timed",
     includeWriting: true,
@@ -125,6 +130,11 @@ test("test preferences default to focus mode and preserve explicit opt-outs", ()
       showTimer: false,
     }),
     {
+      aiLanguage: "zh",
+      aiProvider: "codex",
+      aiModel: "",
+      aiDuring: "off",
+      aiPrompt: C.preferences().aiPrompt,
       focusMode: false,
       mode: "practice",
       includeWriting: false,
@@ -141,4 +151,20 @@ test("test preferences default to focus mode and preserve explicit opt-outs", ()
     C.preferences(),
   );
   assert.deepEqual(C.preferences(null), C.preferences());
+});
+
+test("AI use during attempts requires an explicit hint/full preference", () => {
+  for (const aiDuring of [undefined, true, "true", "on", null])
+    assert.equal(C.preferences({ aiDuring }).aiDuring, "off");
+  assert.equal(C.preferences({ aiDuring: "hint" }).aiDuring, "hint");
+  assert.equal(C.preferences({ aiDuring: "full" }).aiDuring, "full");
+  assert.equal(C.preferences({ aiProvider: "unknown" }).aiProvider, "codex");
+});
+
+test("explanation language is explicit and preset prompts do not control it", () => {
+  assert.equal(
+    C.preferences({ aiLanguage: "en", aiPrompt: "用中文" }).aiLanguage,
+    "en",
+  );
+  assert.equal(C.preferences({ aiLanguage: "unknown" }).aiLanguage, "zh");
 });
