@@ -882,6 +882,9 @@ dialog h2 {
 }
 
 /* Library */
+html:has(.library-shell) {
+  scrollbar-gutter: stable;
+}
 .library-shell {
   min-height: 100vh;
   display: grid;
@@ -1263,11 +1266,11 @@ dialog h2 {
   padding: 12px 0;
   background: transparent;
   color: var(--muted);
+  font-weight: 600;
 }
 .library-tabs button[aria-current] {
   border-bottom-color: var(--teal);
   color: var(--teal);
-  font-weight: 600;
 }
 .library-tabs button:hover {
   color: var(--ink);
