@@ -195,7 +195,10 @@ function renderLibrary() {
 }
 function librarySelectionHTML() {
   if (!librarySelection.size) return "";
-  return `<span>${librarySelection.size} selected</span>`;
+  const canMove = [...librarySelection].every(
+    (id) => libItem(id)?.kind !== "category",
+  );
+  return `${librarySelection.size > 1 ? `<button data-lib-bulk="move" ${canMove ? "" : "disabled"}>Move</button><button class="danger quiet" data-lib-bulk="delete">Delete</button>` : ""}<span>${librarySelection.size} selected</span>`;
 }
 function libraryItemHTML(r) {
   const isTest = r.kind === "test";
@@ -255,17 +258,6 @@ function libraryNameDialog(kind, id) {
 }
 function libraryItemMenu(id, anchor) {
   const r = libItem(id);
-  if (librarySelection.has(id) && librarySelection.size > 1) {
-    const count = librarySelection.size;
-    const canMove = [...librarySelection].every(
-      (key) => libItem(key)?.kind !== "category",
-    );
-    libraryContextMenu(
-      anchor,
-      `${canMove ? `<button role="menuitem" data-lib-bulk="move">Move ${count} items…</button>` : ""}<button role="menuitem" class="danger" data-lib-bulk="delete">Delete ${count} items…</button><button role="menuitem" data-lib-bulk="clear">Clear selection</button>`,
-    );
-    return;
-  }
   libraryContextMenu(
     anchor,
     `<button role="menuitem" data-lib-rename="${esc(id)}">Rename</button>${r.kind !== "category" ? `<button role="menuitem" data-lib-move="${esc(id)}">Move to…</button>` : ""}${r.kind === "test" ? `<button role="menuitem" data-lib-copy="${esc(id)}">Create a copy or practice…</button><button role="menuitem" data-lib-export="${esc(id)}">Export test</button>` : ""}<button role="menuitem" class="danger" data-lib-delete="${esc(id)}">Delete…</button>`,
@@ -835,10 +827,9 @@ document.addEventListener(
       e.stopImmediatePropagation();
       return;
     }
-    const itemMenu = e.target.closest("[data-lib-menu]");
-    const selectionAction =
-      e.target.closest("#library-context-menu") ||
-      (itemMenu && librarySelection.has(itemMenu.dataset.libMenu));
+    const selectionAction = e.target.closest(
+      "#library-selection-actions, #library-context-menu, [data-lib-menu]",
+    );
     if (screen === "home" && librarySelection.size && !selectionAction) {
       librarySelection.clear();
       paintLibrarySelection();
