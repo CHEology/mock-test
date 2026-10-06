@@ -2,10 +2,11 @@
 const AI = (() => {
   const cache = new Map(),
     drafts = new Map(),
-    errors = new Map();
+    errors = new Map(),
+    resultTargets = new Map(),
+    submitting = new Set();
   let target = null,
     polling = false,
-    submitting = false,
     batch = null;
   const busy = (r) => r && ["queued", "running"].includes(r.status);
   const allowed = () =>
@@ -22,7 +23,7 @@ const AI = (() => {
       t.si < 0 ? "writing" : "question",
     ]);
   const records = (attempt) => cache.get(attempt) || [];
-  const record = () =>
+  const record = (target = currentTarget()) =>
     target &&
     records(target.attempt).find(
       (r) =>
@@ -31,6 +32,7 @@ const AI = (() => {
         r.mode === target.mode &&
         (r.language || "zh") === target.language,
     );
+  const currentTarget = () => target;
   const writing = (a = active) => ({
     id: "@writing",
     text: DATA.find((t) => t.id === a.test).essay,
@@ -44,7 +46,7 @@ const AI = (() => {
           s: DATA.find((t) => t.id === a.test).sections[si],
           q: DATA.find((t) => t.id === a.test).sections[si].questions[qi],
         };
-  const visible = () =>
+  const visible = (target = currentTarget()) =>
     target &&
     active?.id === target.attempt &&
     allowed() &&
@@ -58,8 +60,10 @@ const AI = (() => {
     allowed()
       ? `<button data-ai="open">${mode() === "hint" ? "Hint" : active.section < 0 ? "Review writing" : "Explain"}</button>`
       : "";
-  const slot = () =>
-    settings.aiEnabled ? '<div id="ai-panel-slot"></div>' : "";
+  const slot = (si, qi) =>
+    settings.aiEnabled
+      ? `<div id="${si === undefined ? "ai-panel-slot" : `ai-slot-${si}-${qi}`}"></div>`
+      : "";
   async function api(path, value) {
     const response = await fetch(
       "/api/ai/" + path,
@@ -118,27 +122,40 @@ const AI = (() => {
     return esc(value).replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
   }
   function paint() {
-    const slot = $("#ai-panel-slot");
+    if (screen === "results") {
+      paintPanel(target?.si < 0 ? target : null);
+      for (const selected of resultTargets.values()) paintPanel(selected);
+    } else paintPanel(target);
+  }
+  function paintPanel(target) {
+    const slot =
+      screen === "results" && target?.si >= 0
+        ? $(`#ai-slot-${target.si}-${target.qi}`)
+        : $("#ai-panel-slot");
+    const $panel = (selector) => slot?.querySelector(selector);
     if (!slot) return;
-    if (!visible()) {
+    if (!visible(target)) {
       slot.innerHTML = "";
       return;
     }
-    const r = record(),
+    const r = record(target),
       { s, q } = item(active, target.si, target.qi);
-    if (!$("#ai-panel") || $("#ai-panel").dataset.key !== key(target)) {
-      slot.innerHTML = `<section id="ai-panel" class="ai-panel" aria-label="Question explanation" data-key="${esc(key(target))}"><header class="row spread"><h2>${q.task === "writing" ? "Writing" : `${esc(s.label)} · Q${q.number}`} · ${target.mode === "hint" ? "Hint" : q.task === "writing" ? "Feedback" : "Explanation"}</h2><button data-ai="close" class="quiet" aria-label="Close explanation">Close</button></header>${screen === "results" ? `<details class="ai-question"><summary>Question</summary>${q.image ? `<img src="${esc(q.image)}" alt="Question ${q.number}">` : `<p>${esc(q.text || (q.sentences || []).join(" ") + "\n" + (q.prompt || ""))}</p>`}${q.options ? `<p>${q.options.map((column, i) => `Blank ${i + 1}: ${column.map((v, j) => `${letters(column.length)[j]}. ${esc(v)}`).join(" · ")}`).join("<br>")}</p>` : ""}${q.task === "writing" ? `<h3>Your writing</h3><p>${esc(active.essay || "")}</p>` : ""}${q.labels ? `<p>${q.labels.map((v, i) => `${letters(q.labels.length)[i]}. ${esc(v)}`).join("<br>")}</p>` : ""}</details>` : ""}<div id="ai-messages"></div><div id="ai-status" role="status"></div>${q.task === "writing" && active.status !== "done" ? '<button data-ai="refresh-writing" class="quiet">Review current draft</button>' : ""}<form id="ai-followup" class="ai-followup"><textarea aria-label="Ask a follow-up" placeholder="Ask a follow-up…" rows="2" maxlength="8000">${esc(drafts.get(key(target)) || "")}</textarea><button class="primary" type="submit">Send</button></form></section>`;
-      $("#ai-followup textarea").oninput = (e) =>
+    if (
+      !$panel(".ai-panel") ||
+      $panel(".ai-panel").dataset.key !== key(target)
+    ) {
+      slot.innerHTML = `<section class="ai-panel" aria-label="Question explanation" data-key="${esc(key(target))}" data-ai-owner="${target.si},${target.qi}"><header class="row spread"><h2>${q.task === "writing" ? "Writing" : `${esc(s.label)} · Q${q.number}`} · ${target.mode === "hint" ? "Hint" : q.task === "writing" ? "Feedback" : "Explanation"}</h2><button data-ai="close" class="quiet" aria-label="Close explanation">Close</button></header>${screen === "results" && target.si < 0 ? `<details class="ai-question"><summary>Question</summary>${q.image ? `<img src="${esc(q.image)}" alt="Question ${q.number}">` : `<p>${esc(q.text || (q.sentences || []).join(" ") + "\n" + (q.prompt || ""))}</p>`}${q.options ? `<p>${q.options.map((column, i) => `Blank ${i + 1}: ${column.map((v, j) => `${letters(column.length)[j]}. ${esc(v)}`).join(" · ")}`).join("<br>")}</p>` : ""}${q.task === "writing" ? `<h3>Your writing</h3><p>${esc(active.essay || "")}</p>` : ""}${q.labels ? `<p>${q.labels.map((v, i) => `${letters(q.labels.length)[i]}. ${esc(v)}`).join("<br>")}</p>` : ""}</details>` : ""}<div class="ai-messages"></div><div class="ai-status" role="status"></div>${q.task === "writing" && active.status !== "done" ? '<button data-ai="refresh-writing" class="quiet">Review current draft</button>' : ""}<form class="ai-followup"><textarea aria-label="Ask a follow-up" placeholder="Ask a follow-up…" rows="2" maxlength="8000">${esc(drafts.get(key(target)) || "")}</textarea><button class="primary" type="submit">Send</button></form></section>`;
+      $panel(".ai-followup textarea").oninput = (e) =>
         drafts.set(key(target), e.target.value);
-      $("#ai-followup").onsubmit = (e) => {
+      $panel(".ai-followup").onsubmit = (e) => {
         e.preventDefault();
-        send();
+        send(false, target);
       };
     }
     const conversation = [...(r?.messages || [])];
     if (r?.followup && (busy(r) || r.status === "error"))
       conversation.push({ role: "user", text: r.followup });
-    const messages = $("#ai-messages"),
+    const messages = $panel(".ai-messages"),
       signature = JSON.stringify(conversation);
     if (messages.dataset.signature !== signature) {
       messages.dataset.signature = signature;
@@ -150,9 +167,9 @@ const AI = (() => {
         )
         .join("");
     }
-    const pending = busy(r) || submitting;
+    const pending = busy(r) || submitting.has(key(target));
     const error = errors.get(key(target)) || r?.error;
-    const status = $("#ai-status");
+    const status = $panel(".ai-status");
     status.innerHTML = pending
       ? `<span>${r?.status === "queued" ? "Queued" : "Thinking…"}</span><button class="quiet" data-ai="stop">Stop</button>`
       : error
@@ -160,10 +177,10 @@ const AI = (() => {
         : !r?.messages.length
           ? '<button data-ai="retry">Explain</button>'
           : "";
-    if ($('[data-ai="refresh-writing"]'))
-      $('[data-ai="refresh-writing"]').disabled = pending;
-    $("#ai-followup button").disabled = pending || !r?.messages.length;
-    $("#ai-followup").hidden = !r?.messages.length;
+    if ($panel('[data-ai="refresh-writing"]'))
+      $panel('[data-ai="refresh-writing"]').disabled = pending;
+    $panel(".ai-followup button").disabled = pending || !r?.messages.length;
+    $panel(".ai-followup").hidden = !r?.messages.length;
   }
   function batchStatus() {
     const el = $("#ai-batch");
@@ -178,15 +195,18 @@ const AI = (() => {
           r.question === button.dataset.aiQuestion &&
           (r.language || "zh") === settings.aiLanguage,
       );
-      button.textContent = busy(r)
-        ? r.status === "queued"
-          ? "Queued"
-          : "Thinking…"
-        : r?.messages.length
-          ? "Explanation"
-          : r?.status === "error"
-            ? "Retry"
-            : "Explain";
+      button.textContent =
+        button.getAttribute("aria-expanded") === "true"
+          ? "Hide explanation"
+          : busy(r)
+            ? r.status === "queued"
+              ? "Queued"
+              : "Thinking…"
+            : r?.messages.length
+              ? "Explanation"
+              : r?.status === "error"
+                ? "Retry"
+                : "Explain";
     });
     const button = $('[data-ai="batch"]');
     if (button) button.disabled = !!batch || pending > 0;
@@ -211,7 +231,7 @@ const AI = (() => {
     if (!allowed()) return;
     const a = active,
       { q } = item(a, si, qi);
-    target = {
+    const selected = {
       attempt: a.id,
       question: q.id,
       si,
@@ -219,33 +239,43 @@ const AI = (() => {
       mode: mode(),
       language: settings.aiLanguage,
     };
-    const opened = key(target);
+    target = selected;
+    if (screen === "results" && si >= 0)
+      resultTargets.set(`${si},${qi}`, selected);
+    const opened = key(selected);
     errors.delete(opened);
     paint();
-    $("#ai-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (screen !== "results")
+      $(".ai-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     try {
       await refresh(a.id);
-      if (!visible() || key(target) !== opened) return;
-      if (!record()) await submit(a, si, qi, target.mode);
+      if (
+        !visible(selected) ||
+        (screen === "results" && si >= 0
+          ? resultTargets.get(`${si},${qi}`) !== selected
+          : target !== selected)
+      )
+        return;
+      if (!record(selected)) await submit(a, si, qi, selected.mode);
     } catch (e) {
       errors.set(opened, e.message);
       paint();
     }
   }
   async function submit(a, si, qi, selectedMode, followup = "") {
-    if (!settings.aiEnabled || submitting) return;
+    if (!settings.aiEnabled) return;
     // Snapshot the question, answer, and preferences before any asynchronous work.
     const request = payload(a, si, qi, selectedMode, followup);
-    errors.delete(
-      key({
-        attempt: a.id,
-        question: request.question,
-        si,
-        mode: selectedMode,
-        language: request.language,
-      }),
-    );
-    submitting = true;
+    const requestKey = key({
+      attempt: a.id,
+      question: request.question,
+      si,
+      mode: selectedMode,
+      language: request.language,
+    });
+    if (submitting.has(requestKey)) return;
+    errors.delete(requestKey);
+    submitting.add(requestKey);
     paint();
     try {
       if (!diskReady || !(await flushDisk()))
@@ -256,23 +286,30 @@ const AI = (() => {
       await api("explain", request);
       await refresh(a.id);
     } finally {
-      submitting = false;
+      submitting.delete(requestKey);
       paint();
     }
   }
-  async function send(retry = false) {
-    if (!visible()) return;
-    const selected = { ...target },
+  async function send(retry = false, owner = target) {
+    if (!visible(owner)) return;
+    const selected = { ...owner },
       draftKey = key(selected);
     const followup = retry
-      ? record()?.followup || ""
+      ? record(selected)?.followup || ""
       : (drafts.get(draftKey) || "").trim();
     if (!retry && !followup) return;
     try {
       await submit(active, selected.si, selected.qi, selected.mode, followup);
       drafts.delete(draftKey);
-      if (visible() && key(target) === draftKey)
-        $("#ai-followup textarea").value = "";
+      const slot =
+        screen === "results" && selected.si >= 0
+          ? $(`#ai-slot-${selected.si}-${selected.qi}`)
+          : $("#ai-panel-slot");
+      if (
+        visible(selected) &&
+        slot?.querySelector(".ai-panel")?.dataset.key === draftKey
+      )
+        slot.querySelector(".ai-followup textarea").value = "";
     } catch (e) {
       errors.set(draftKey, e.message);
       paint();
@@ -316,8 +353,7 @@ const AI = (() => {
         await api("explain", request);
       }
       await refresh(a.id);
-      if (active?.id === a.id && screen === "results" && !token.stop)
-        await open(...todo[0]);
+      // Batch work updates row buttons without moving or expanding the page.
     } catch (e) {
       notify(e.message);
     } finally {
@@ -346,6 +382,9 @@ const AI = (() => {
     const button = e.target.closest("[data-ai]");
     if (!settings.aiEnabled || !button || button.disabled) return;
     e.preventDefault();
+    const owner = button.closest("[data-ai-owner]")?.dataset.aiOwner;
+    if (screen === "results" && owner && resultTargets.has(owner))
+      target = resultTargets.get(owner);
     try {
       switch (button.dataset.ai) {
         case "open":
@@ -363,12 +402,18 @@ const AI = (() => {
             "Review the current draft supplied with this request. Identify what still needs improvement.",
           );
           break;
-        case "question":
-          await open(...button.dataset.aiPosition.split(",").map(Number));
+        case "question": {
+          const [si, qi] = button.dataset.aiPosition.split(",").map(Number);
+          if (toggleResultQuestion(si, qi, true)) await open(si, qi);
           break;
+        }
         case "close":
-          target = null;
-          paint();
+          if (screen === "results" && target?.si >= 0)
+            toggleResultQuestion(target.si, target.qi, true);
+          else {
+            target = null;
+            paint();
+          }
           break;
         case "retry":
           await send(true);
@@ -376,12 +421,15 @@ const AI = (() => {
         case "batch":
           await explainWrong();
           break;
-        case "stop":
-          if (record()) {
-            await api("stop", { attempt: target.attempt, id: record().id });
-            await refresh(target.attempt);
+        case "stop": {
+          const selected = target,
+            saved = record(selected);
+          if (saved) {
+            await api("stop", { attempt: selected.attempt, id: saved.id });
+            await refresh(selected.attempt);
           }
           break;
+        }
         case "stop-all":
           if (batch) batch.stop = true;
           await api("stop", { attempt: active.id });
@@ -409,9 +457,26 @@ const AI = (() => {
       polling = false;
     }
   }, 1800);
+  function closeResult(si, qi) {
+    const id = `${si},${qi}`;
+    if (target === resultTargets.get(id)) target = null;
+    resultTargets.delete(id);
+    const slot = $(`#ai-slot-${si}-${qi}`);
+    if (slot) slot.innerHTML = "";
+  }
   function reset() {
     target = null;
+    resultTargets.clear();
     if (!settings.aiEnabled && batch) batch.stop = true;
   }
-  return { button, slot, mount, providers, context, reset, incorrectQuestions };
+  return {
+    button,
+    slot,
+    mount,
+    providers,
+    context,
+    reset,
+    closeResult,
+    incorrectQuestions,
+  };
 })();

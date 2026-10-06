@@ -26,6 +26,8 @@ The sidebar can stay pinned or auto-hide: move to the left edge to reveal it, mo
 
 Drag a rectangle in any direction across empty space, including blank row space, to select items. Drag names, icons, or an already-selected group to move items. Clicking an item does not select it. Click elsewhere in the interface or press Escape to clear selection. When multiple items are selected, Move and Delete appear beside the selection count. Each item’s “…” menu acts only on that item. Drag tests and folders onto destinations in the page, breadcrumbs, or sidebar. Hold over a directory to open it during a drag; the left edge reveals the auto-hidden sidebar. Tests can live directly in a category or inside its folders.
 
+Before manually finishing a section, a review page shows answered, unanswered, and marked questions. Click a question to return, or **Confirm finish** to submit the section. The timer keeps running on this page; time expiry still ends the section automatically.
+
 ## Add your questions
 
 Use **Add test** inside a folder to create a writing task or import JSON tests. The import dialog includes an example file. Exported tests embed their images and can be imported on another installation. **Create a copy or practice** lets you select sections from an existing test. Deleting a test, folder, or category requires a confirmation dialog. Deleting a folder or category also removes its contents from the library. Saved attempts and their question content remain available in Attempts. There is no Trash or Restore action.
@@ -42,7 +44,7 @@ Install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or 
 
 The **Explanations** master switch in Settings defaults to on. Switching it off hides all tutor controls and its detailed settings immediately, while preserving saved conversations and preferences.
 
-Results have **Explain** per question and **Explain incorrect & unanswered** for wrong and unanswered questions. Disputed questions can still be explained individually. Writing tasks have **Review writing** for argument, structure, and language feedback, with **Review current draft** after edits. Conversations and follow-ups appear inline. Jobs run one at a time and can be stopped or retried. Leaving a page does not stop a submitted job.
+Results have **Question** to expand a question on its own and **Explain** to expand it with an explanation, directly below its row. Click the same button again to collapse. Multiple questions can stay open. Use **Explain** per question and **Explain incorrect & unanswered** for wrong and unanswered questions. Disputed questions can still be explained individually. Writing tasks have **Review writing** for argument, structure, and language feedback, with **Review current draft** after edits. Conversations and follow-ups appear inline. Jobs run one at a time and can be stopped or retried. Leaving a page does not stop a submitted job.
 
 During attempts, explanations are **Off** by default. Choose **Hints only** or **Full explanations** to enable them. Hint requests omit the supplied answer key and prior full explanations; the model is instructed to avoid giving the answer. The timer keeps running.
 

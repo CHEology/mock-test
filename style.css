@@ -415,6 +415,7 @@ p {
   margin: 28px 0;
 }
 .results {
+  overflow-anchor: none;
   max-width: 1120px;
   margin: auto;
   padding: 36px;
@@ -448,11 +449,67 @@ p {
   border-bottom: 1px solid var(--line);
   text-align: left;
 }
-.results tr[data-review] {
-  cursor: pointer;
+.results table {
+  table-layout: fixed;
 }
-.results tr[data-review]:hover {
+.results th:first-child {
+  width: 10%;
+}
+.results th:last-child {
+  width: 34%;
+}
+.results td {
+  overflow-wrap: anywhere;
+}
+.result-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.result-actions button {
+  flex: 1;
+  white-space: nowrap;
+}
+.result-actions button[aria-expanded="true"] {
   background: var(--pale);
+  border-color: #65a7a0;
+}
+.result-detail[hidden] {
+  display: none;
+}
+.results .result-detail > td {
+  padding: 24px;
+}
+.result-question-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.result-question .text-question {
+  max-width: none;
+}
+.result-options p {
+  margin: 8px 0;
+}
+.result-detail .ai-panel {
+  margin-bottom: 0;
+}
+.section-review {
+  width: 100%;
+  max-width: 900px;
+  padding: 40px 32px;
+  margin: 0 auto;
+  overflow: auto;
+}
+.section-review h1 {
+  font-size: 30px;
+}
+.section-review .review-grid {
+  margin: 28px 0;
+}
+.section-finish-note {
+  margin-top: 28px;
 }
 .tag-correct {
   color: #18764b;
@@ -882,7 +939,7 @@ dialog h2 {
 }
 
 /* Library */
-html:has(.library-shell) {
+html:has(.library-shell, .results) {
   scrollbar-gutter: stable;
 }
 .library-shell {
@@ -1583,7 +1640,7 @@ html:has(.library-shell) {
   font: inherit;
   background: white;
 }
-#ai-status {
+.ai-status {
   display: flex;
   align-items: center;
   gap: 12px;

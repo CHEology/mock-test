@@ -523,27 +523,32 @@ function refreshControls() {
     pos; /* Numeric inputs are mounted by renderTest, selection controls use delegation. */
 }
 function reviewDialog() {
-  const s = section();
-  dialog(
-    `<h2>${esc(s.label)} · Review section</h2><div class="review-grid">${s.questions
-      .map((q, i) => {
-        const yes = C.answered(q, active.answers[q.id]),
-          flag = active.flags[q.id];
-        return `<button class="review-cell ${yes ? "answered" : ""} ${flag ? "flagged" : ""}" data-jump="${i}"><strong>${q.number}${flag ? " ★" : ""}</strong><span class="status">${yes ? "Answered" : "Unanswered"}</span></button>`;
-      })
-      .join(
-        "",
-      )}</div><div class="dialog-actions"><button data-action="close">Return</button>${reviewing ? "" : '<button class="primary" data-action="finish">Finish section</button>'}</div>`,
-  );
+  renderSectionReview();
 }
 function finishDialog() {
-  const s = section(),
-    missing = s
-      ? s.questions.filter((q) => !C.answered(q, active.answers[q.id])).length
-      : 0;
-  dialog(
-    `<h2>${s ? "Finish " + esc(s.label) + "?" : "Finish writing?"}</h2><p>${missing ? `${missing} question${missing > 1 ? "s are" : " is"} unanswered. ` : ""}You cannot return to this section after finishing.</p><div class="dialog-actions"><button data-action="close">Keep working</button><button class="primary" data-action="confirm-finish">Finish section</button></div>`,
-  );
+  renderSectionReview();
+}
+function renderSectionReview() {
+  closeModal();
+  closeTools();
+  testHelpOpen = false;
+  screen = "section-review";
+  const s = section();
+  const answered =
+    s?.questions.filter((q) => C.answered(q, active.answers[q.id])).length || 0;
+  const marked = s?.questions.filter((q) => active.flags[q.id]).length || 0;
+  app.innerHTML = `<div class="test-shell">${testHeader()}<main class="section-review"><h1>${esc(s?.label || "Writing")} · Review</h1>${
+    s
+      ? `<p>${answered} answered · ${s.questions.length - answered} unanswered · ${marked} marked</p><div class="review-grid">${s.questions
+          .map((q, i) => {
+            const yes = C.answered(q, active.answers[q.id]),
+              flag = active.flags[q.id];
+            return `<button class="review-cell ${yes ? "answered" : ""} ${flag ? "flagged" : ""}" data-jump="${i}"><strong>${q.number}${flag ? " ★" : ""}</strong><span class="status">${yes ? "Answered" : "Unanswered"}</span></button>`;
+          })
+          .join("")}</div>`
+      : `<p>${wordCount(active.essay)} words</p>`
+  }${reviewing ? "" : '<p class="section-finish-note">You cannot return to this section after finishing.</p>'}<div class="row spread"><button data-action="return-section">Keep working</button>${reviewing ? "" : '<button class="primary" data-action="confirm-finish">Confirm finish</button>'}</div></main></div>`;
+  updateTimer();
 }
 function finishSection(expired = false) {
   if (!active || active.status !== "running" || reviewing) return;
@@ -572,7 +577,8 @@ function renderBetween() {
   app.innerHTML = `<main class="center-screen"><div class="eyebrow">${esc(testName(test()))}</div><h1 style="margin-top:22px">${active.expired ? "Time is up." : "Section complete."}</h1><p>Your answers have been saved.</p><div class="card" style="margin:32px 0"><h2>Next: ${esc(s.title || s.label)}</h2><div class="section-track"><span>${s.questions.length} questions</span><span>${active.mode === "timed" ? s.minutes + " minutes" : "Untimed"}</span></div></div><div class="row spread">${homeButton()}<button class="primary" data-action="next-section">Start ${esc(s.label)}</button></div></main>`;
 }
 function updateTimer() {
-  if (screen !== "test" || reviewing || !active) return;
+  if (!["test", "section-review"].includes(screen) || reviewing || !active)
+    return;
   const el = $("#timer");
   if (!el) return;
   let remaining =
@@ -590,6 +596,7 @@ function renderResults() {
   screen = "results";
   reviewing = false;
   closeTools();
+  AI.reset();
   const t = test();
   document.title = `${testName(t)} results | Mock Test`;
   let total = 0,
@@ -608,15 +615,51 @@ function renderResults() {
   app.innerHTML = `<main class="results"><div class="row spread"><button data-action="results-history">← Attempts</button><div class="row"><button data-action="export-attempt">Export</button><button class="danger quiet" data-action="delete-current">Delete result</button></div></div><div style="margin-top:40px"><div class="eyebrow">${esc(testName(t))} · ${active.mode === "timed" ? "Timed" : "Untimed"}</div><h1 style="margin-top:16px">${total ? `${correct} of ${total} correct` : t.sections.length ? "No scored questions" : "Writing complete"}</h1>${excluded ? `<p class="muted">${excluded} disputed question${excluded > 1 ? "s" : ""} excluded from scoring.</p>` : ""}</div><div class="results-summary">${cards}</div><div class="row spread"><h2 style="margin:0">${t.sections.length ? "Review your answers" : "Your writing"}</h2>${active.includeEssay ? `<div class="row"><button data-action="review-essay">Read your essay</button>${settings.aiEnabled ? '<button data-ai="writing">Review writing</button>' : ""}</div>` : ""}${settings.aiEnabled && t.sections.length ? '<button data-ai="batch">Explain incorrect & unanswered</button>' : ""}</div>${settings.aiEnabled ? '<div id="ai-batch" class="row ai-batch"></div>' : ""}${AI.slot()}${t.sections
     .map(
       (s, si) =>
-        `<h3 style="margin-top:32px">${esc(s.label)}</h3><table><thead><tr><th>Question</th><th>Your answer</th><th>Key</th><th>Result</th>${settings.aiEnabled ? "<th></th>" : ""}</tr></thead><tbody>${s.questions
+        `<h3 style="margin-top:32px">${esc(s.label)}</h3><table><thead><tr><th>Question</th><th>Your answer</th><th>Key</th><th>Result</th><th></th></tr></thead><tbody>${s.questions
           .map((q, qi) => {
             const g = C.grade(q, active.answers[q.id]);
-            return `<tr tabindex="0" data-review="${si},${qi}"><td>${q.number}${active.flags[q.id] ? " ★" : ""}</td><td>${esc(C.display(q, active.answers[q.id]))}</td><td>${esc(q.key)}</td><td class="${g === null ? "tag-dispute" : g ? "tag-correct" : "tag-incorrect"}">${g === null ? "Disputed" : g ? "Correct" : C.answered(q, active.answers[q.id]) ? "Incorrect" : "Unanswered"} →</td>${settings.aiEnabled ? `<td><button data-ai="question" data-ai-question="${esc(q.id)}" data-ai-position="${si},${qi}">Explain</button></td>` : ""}</tr>`;
+            return `<tr><td>${q.number}${active.flags[q.id] ? " ★" : ""}</td><td>${esc(C.display(q, active.answers[q.id]))}</td><td>${esc(q.key)}</td><td class="${g === null ? "tag-dispute" : g ? "tag-correct" : "tag-incorrect"}">${g === null ? "Disputed" : g ? "Correct" : C.answered(q, active.answers[q.id]) ? "Incorrect" : "Unanswered"}</td><td><div class="result-actions"><button data-result-question="${si},${qi}" aria-expanded="false" aria-controls="result-detail-${si}-${qi}">Question</button>${settings.aiEnabled ? `<button data-ai="question" data-ai-question="${esc(q.id)}" data-ai-position="${si},${qi}" aria-expanded="false" aria-controls="result-detail-${si}-${qi}">Explain</button>` : ""}</div></td></tr><tr id="result-detail-${si}-${qi}" class="result-detail" hidden><td colspan="5"><div class="result-question"></div>${AI.slot(si, qi)}</td></tr>`;
           })
           .join("")}</tbody></table>`,
     )
     .join("")}</main>`;
   AI.mount();
+}
+function resultQuestionHTML(q) {
+  if (q.image)
+    return `<img class="result-question-image" src="${esc(q.image)}" alt="Question ${q.number}">`;
+  const body = q.sentences
+    ? `<div class="passage">${q.sentences.map((sentence, i) => `<p><strong>${letters(q.sentences.length)[i]}.</strong> ${esc(sentence)}</p>`).join("")}</div><p>${esc(q.prompt)}</p>`
+    : textQuestion(q);
+  return (
+    body +
+    (q.labels
+      ? `<div class="result-options">${q.labels.map((label, i) => `<p><strong>${letters(q.labels.length)[i]}.</strong> ${esc(label)}</p>`).join("")}</div>`
+      : "")
+  );
+}
+function toggleResultQuestion(si, qi, explain = false) {
+  if (screen !== "results") return false;
+  const row = $(`#result-detail-${si}-${qi}`);
+  if (!row) return false;
+  const mode = explain ? "explanation" : "question";
+  const open = row.hidden || row.dataset.mode !== mode;
+  AI.closeResult(si, qi);
+  row.hidden = !open;
+  row.dataset.mode = open ? mode : "";
+  if (open && !row.querySelector(".result-question").hasChildNodes())
+    row.querySelector(".result-question").innerHTML = resultQuestionHTML(
+      test().sections[si].questions[qi],
+    );
+  const questionButton = $(`[data-result-question="${si},${qi}"]`);
+  questionButton.setAttribute("aria-expanded", String(open && !explain));
+  questionButton.textContent = open && !explain ? "Hide question" : "Question";
+  $(`[data-ai-position="${si},${qi}"]`)?.setAttribute(
+    "aria-expanded",
+    String(open && explain),
+  );
+  AI.mount();
+  return open;
 }
 function enterReview(si, qi) {
   reviewing = true;
@@ -878,7 +921,7 @@ function applySettings(next) {
   else if (languageChanged) AI.mount();
   if ($("#setting-mode")) $("#setting-mode").value = settings.mode;
   if (!settings.focusMode) leaveFocusMode();
-  if (timerChanged && screen === "test") {
+  if (timerChanged && ["test", "section-review"].includes(screen)) {
     hideTime = !settings.showTimer;
     const button = $('[data-action="time"]');
     if (button) button.textContent = hideTime ? "Show time" : "Hide time";
@@ -895,7 +938,7 @@ function applySettings(next) {
 }
 
 function helpContent(inTest = false) {
-  return `<div class="help-content">${inTest ? "" : "<section><h2>Your library</h2><p>Organize tests into categories and folders. Use the ··· menu to rename, move, or create a practice copy. Deleting items requires confirmation; saved attempts are kept.</p></section>"}<section><h2>Answering questions</h2><p>Select answers on the right. Unlabelled choices follow their order in the question; each blank starts at A. Numeric answers accept decimals or fractions. For sentence-selection questions, click the passage directly.</p><p>Use Mark and Review to revisit questions within the current section. Calculator and Scratchpad are available from the test toolbar.</p></section><section><h2>Timing and progress</h2><p>Progress saves automatically. Timed sections keep counting while you read Help or leave the test. Save &amp; exit lets you return later; finishing a section moves you forward.</p></section><section><h2>Attempts and results</h2><p>Each category and folder has its own Attempts tab. Resume, review, export, or delete attempts there. Results use the supplied answer key; writing is saved without automatic grading.</p></section>${settings.aiEnabled ? `<section><h2>Explanations</h2><p>Install and sign in to Codex CLI or Claude Code on this computer, then choose the channel, model tier, language, and preset prompt in Settings. On results, use Explain for one question or Explain incorrect & unanswered for incorrect and unanswered questions. Use Review writing for feedback on an essay. Continue the conversation below the explanation.</p><p>During attempts, explanations are off unless you enable hints or full explanations. Chinese and English explanations keep passage, question, and option quotations in their original wording. Conversations are saved per attempt and question; switching language opens a separate conversation.</p></section>` : ""}<section><h2>Focus mode</h2><p>Tests open full screen by default. Press Esc or Exit focus to leave full screen. Change the default in Settings or turn it off before starting a test.</p></section></div>`;
+  return `<div class="help-content">${inTest ? "" : "<section><h2>Your library</h2><p>Organize tests into categories and folders. Use the ··· menu to rename, move, or create a practice copy. Deleting items requires confirmation; saved attempts are kept.</p></section>"}<section><h2>Answering questions</h2><p>Select answers on the right. Unlabelled choices follow their order in the question; each blank starts at A. Numeric answers accept decimals or fractions. For sentence-selection questions, click the passage directly.</p><p>Use Mark and Review to revisit questions within the current section. Calculator and Scratchpad are available from the test toolbar.</p></section><section><h2>Timing and progress</h2><p>Progress saves automatically. Timed sections keep counting while you read Help or leave the test. Save &amp; exit lets you return later; finishing a section moves you forward.</p></section><section><h2>Attempts and results</h2><p>Each category and folder has its own Attempts tab. Resume, review, export, or delete attempts there. Results use the supplied answer key; writing is saved without automatic grading.</p></section>${settings.aiEnabled ? `<section><h2>Explanations</h2><p>Install and sign in to Codex CLI or Claude Code on this computer, then choose the channel, model tier, language, and preset prompt in Settings. On results, use Question to expand a question without explanations, or Explain to expand it with an explanation. Click the same button again to collapse. Use Explain for one question or Explain incorrect & unanswered for incorrect and unanswered questions. Use Review writing for feedback on an essay. Continue the conversation below the explanation.</p><p>During attempts, explanations are off unless you enable hints or full explanations. Chinese and English explanations keep passage, question, and option quotations in their original wording. Conversations are saved per attempt and question; switching language opens a separate conversation.</p></section>` : ""}<section><h2>Focus mode</h2><p>Tests open full screen by default. Press Esc or Exit focus to leave full screen. Change the default in Settings or turn it off before starting a test.</p></section></div>`;
 }
 function help() {
   if (screen === "test") {
@@ -924,7 +967,8 @@ async function action(name) {
       break;
     case "time":
       hideTime = !hideTime;
-      renderTest();
+      if (screen === "section-review") renderSectionReview();
+      else renderTest();
       break;
     case "settings":
       renderSettings();
@@ -971,6 +1015,9 @@ async function action(name) {
         if (!reviewing) save();
         renderTest();
       }
+      break;
+    case "return-section":
+      renderTest();
       break;
     case "finish":
       finishDialog();
@@ -1047,7 +1094,7 @@ async function action(name) {
   }
 }
 document.addEventListener("click", (e) => {
-  const el = e.target.closest("button,[data-review]");
+  const el = e.target.closest("button");
   if (!el || el.disabled) return;
   if (el.dataset.action) action(el.dataset.action);
   else if (el.dataset.history) historyDialog(el.dataset.history);
@@ -1073,9 +1120,8 @@ document.addEventListener("click", (e) => {
     renderTest();
     $(".question-pane").scrollTop = scroll;
   } else if (el.dataset.calc) calc(el.dataset.calc);
-  else if (el.dataset.review) {
-    const [si, qi] = el.dataset.review.split(",").map(Number);
-    enterReview(si, qi);
+  else if (el.dataset.resultQuestion) {
+    toggleResultQuestion(...el.dataset.resultQuestion.split(",").map(Number));
   }
 });
 document.addEventListener("change", (e) => {
@@ -1116,9 +1162,6 @@ window.addEventListener("storage", (e) => {
       acceptState(JSON.parse(e.newValue), false);
     } catch (_) {}
   }
-});
-document.addEventListener("keydown", (e) => {
-  if (e.target.matches("[data-review]") && e.key === "Enter") e.target.click();
 });
 window.addEventListener("pagehide", () => {
   if (diskReady && dirty)
