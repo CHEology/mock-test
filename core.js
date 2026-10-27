@@ -24,9 +24,11 @@
       return (
         Array.isArray(a) &&
         a.length === 2 &&
-        a.every((x) => String(x).trim() !== "") &&
-        Number(a[1]) !== 0
+        Number.isFinite(numeric(a.join("/")))
       );
+    if (q.type === "multi")
+      return Array.isArray(a) && a.length > 0 &&
+        new Set(a).size === a.length && (!q.limit || a.length === q.limit);
     if (q.type === "numeric") return Number.isFinite(numeric(a));
     return Array.isArray(a) ? a.length > 0 : !!a;
   }

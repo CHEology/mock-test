@@ -116,8 +116,15 @@ async function init() {
   db = C.mergeState(...candidates);
   const oldLibrary = JSON.stringify(db.library);
   syncLibrary();
-  renderHome();
-  if (oldLibrary !== JSON.stringify(db.library)) save(false);
+  try {
+    localStorage.setItem("mock-test-v1", JSON.stringify(db));
+  } catch (_) {}
+  if (location.hash === "#writing") renderWriting();
+  else if (location.hash === "#vocabulary") renderVocabulary();
+  else renderHome();
+  if (oldLibrary !== JSON.stringify(db.library) ||
+      (diskReady && JSON.stringify(C.mergeState(disk)) !== JSON.stringify(db)))
+    save(false);
 }
 function acceptState(state, persist = true) {
   const previous = active;
@@ -150,10 +157,14 @@ function acceptState(state, persist = true) {
   }
 }
 async function refreshState() {
-  if (!diskReady) return;
   try {
     const r = await fetch("/api/state");
-    if (r.ok) acceptState(await r.json());
+    if (r.ok) {
+      const state = await r.json();
+      diskReady = true;
+      acceptState(state);
+      if (JSON.stringify(C.mergeState(state)) !== JSON.stringify(db)) save(false);
+    }
   } catch (_) {}
 }
 function closeModal() {
@@ -194,6 +205,7 @@ function attemptStatus(a) {
     : `${s.label} · ${a.question + 1}/${s.questions.length}`;
 }
 function renderHome() {
+  if (["#vocabulary", "#writing"].includes(location.hash)) history.replaceState(null, "", location.pathname + location.search);
   testHelpOpen = false;
   leaveFocusMode();
   screen = "home";
@@ -202,6 +214,31 @@ function renderHome() {
   closeTools();
   document.title = "Mock Test";
   renderLibrary();
+}
+function renderWriting() {
+  renderStudySection("writing", "Writing", "GRE writing essays and commentary");
+}
+function renderVocabulary() {
+  renderStudySection("vocabulary", "Vocabulary", "GRE 400 词汇学习");
+}
+function renderStudySection(section, title, frameTitle) {
+  leaveFocusMode();
+  closeModal();
+  closeTools();
+  peekLibrarySidebar(false);
+  active = null;
+  reviewing = false;
+  screen = section;
+  document.title = `${title} | Mock Test`;
+  history.replaceState(null, "", `#${section}`);
+  app.innerHTML = libraryShell(`<iframe id="${section}-frame" title="${frameTitle}" src="${section}.html"></iframe>`, section);
+  const frame = $(`#${section}-frame`);
+  frame.addEventListener("pointerenter", () => peekLibrarySidebar(false));
+  frame.addEventListener("load", () => {
+    // Events inside a study document do not bubble to the app shell.
+    for (const event of ["pointermove", "pointerdown", "focusin"])
+      frame.contentDocument.addEventListener(event, () => peekLibrarySidebar(false));
+  });
 }
 function historyTests() {
   const ids = L.testIds(db.library, historyGroup);
@@ -947,7 +984,14 @@ function help() {
   } else renderInfoPage("Help", helpContent());
 }
 async function action(name) {
+  if (["vocabulary", "writing"].includes(screen) && name !== screen && location.hash === `#${screen}`) history.replaceState(null, "", location.pathname + location.search);
   switch (name) {
+    case "writing":
+      renderWriting();
+      break;
+    case "vocabulary":
+      renderVocabulary();
+      break;
     case "close":
       closeModal();
       break;
@@ -1160,6 +1204,12 @@ document.addEventListener("change", (e) => {
     else selectedAttempts.delete(el.dataset.selectAttempt);
     updateSelection();
   }
+});
+window.addEventListener("hashchange", () => {
+  if (["test", "section-review", "between"].includes(screen)) return;
+  if (location.hash === "#writing") renderWriting();
+  else if (location.hash === "#vocabulary") renderVocabulary();
+  else if (!location.hash && ["writing", "vocabulary"].includes(screen)) renderHome();
 });
 window.addEventListener("storage", (e) => {
   if (e.key === "mock-test-settings" || e.key === null)

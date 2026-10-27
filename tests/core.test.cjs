@@ -12,6 +12,14 @@ test("numeric grading accepts equivalent values and rejects invalid entries", ()
   assert.equal(C.grade({ type: "fraction", key: "2/5" }, ["2", "0"]), false);
 });
 
+test("fraction review counts only valid, finite fractions as answered", () => {
+  const q={type:'fraction'};
+  for(const value of [['words','2'],['1','words'],['1','0'],['1','0.0'],[null,'2'],['1/2','3'],['','2']])
+    assert.equal(C.answered(q,value),false,JSON.stringify(value));
+  assert.equal(C.answered(q,['0','2']),true);
+  assert.equal(C.answered(q,['−2','5']),true);
+});
+
 test("multi-select requires the full set; blank order matters", () => {
   assert.equal(C.grade({ type: "multi", key: "AC" }, ["C", "A"]), true);
   assert.equal(C.grade({ type: "multi", key: "AC" }, ["A"]), false);
@@ -25,6 +33,9 @@ test("multi-select requires the full set; blank order matters", () => {
     false,
   );
   assert.equal(C.answered({ type: "blanks", count: 2 }, ["B", ""]), false);
+  assert.equal(C.answered({type:'multi',limit:2},['A']),false);
+  assert.equal(C.answered({type:'multi',limit:2},['A','C']),true);
+  assert.equal(C.answered({type:'multi'},['A','A']),false);
 });
 
 test("disputed questions remain unscored even if unanswered", () => {

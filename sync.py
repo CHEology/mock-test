@@ -11,7 +11,8 @@ import sys
 ROOT = Path(__file__).resolve().parent
 CONFIG = ROOT / 'local-config.json'
 SHARED = ('README.md', 'EXPLANATIONS.md', 'index.html', 'style.css', 'app.js', 'core.js', 'icon.svg',
-          'data.demo.js', 'ai.js', 'ai.py', 'library.js', 'library-ui.js', 'server.py', 'launch.py')
+          'data.demo.js', 'ai.js', 'ai.py', 'library.js', 'library-ui.js', 'server.py', 'launch.py', 'vocabulary.py', 'vocabulary.html',
+          'writing.html', 'writing.js', 'writing.css')
 
 def sync(destination):
     destination = Path(destination).expanduser().resolve()
@@ -24,6 +25,10 @@ def sync(destination):
         shutil.copy2(ROOT / 'data.js', destination / 'data.js')
     if (ROOT / 'assets').exists():
         shutil.copytree(ROOT / 'assets', destination / 'assets', dirs_exist_ok=True)
+    if (ROOT / 'writing-data.js').exists():
+        shutil.copy2(ROOT / 'writing-data.js', destination / 'writing-data.js')
+    if (ROOT / 'writing-assets').exists():
+        shutil.copytree(ROOT / 'writing-assets', destination / 'writing-assets', dirs_exist_ok=True)
     if sys.platform == 'darwin':
         contents = destination / 'Mock Test.app' / 'Contents'
         (contents / 'MacOS').mkdir(parents=True, exist_ok=True)

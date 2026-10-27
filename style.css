@@ -1314,6 +1314,19 @@ html:has(.library-shell, .results) {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
+}
+.writing-shortcut {
+  margin-left: auto;
+  padding: 9px 14px;
+  border: 1px solid #a8cac4;
+  background: #e7f2ef;
+  color: var(--teal);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.writing-shortcut:hover {
+  background: #d6eae4;
 }
 .sidebar-toggle {
   display: inline-flex;
@@ -1739,4 +1752,17 @@ html:has(.library-shell, .results) {
 }
 .setting-switch:checked::before {
   transform: translateX(22px);
+}
+
+/* Vocabulary stays inside the library shell; its styles are isolated. */
+.library-shell:has(:is(.vocabulary-main, .writing-main)) { height: 100vh; overflow: hidden; }
+.library-shell:has(:is(.vocabulary-main, .writing-main)) > .library-sidebar { height: 100vh; overflow-y: auto; }
+.library-main:is(.vocabulary-main, .writing-main) { padding: 0; height: 100vh; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+:is(.vocabulary-main, .writing-main) .library-topline { padding: 18px 30px; margin: 0; border-bottom: 1px solid var(--line); }
+#vocabulary-frame, #writing-frame { display: block; border: 0; width: 100%; flex: 1; min-height: 0; background: var(--bg); }
+@media (max-width: 720px) {
+ .library-shell:has(:is(.vocabulary-main, .writing-main)) { display: flex; flex-direction: column; }
+ .library-shell:has(:is(.vocabulary-main, .writing-main)) > .library-sidebar { height: auto; max-height: 28vh; flex-shrink: 0; }
+ .library-main:is(.vocabulary-main, .writing-main) { height: auto; flex: 1; min-height: 0; }
+ :is(.vocabulary-main, .writing-main) .library-topline { padding: 10px 18px; }
 }

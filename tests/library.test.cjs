@@ -3,6 +3,12 @@ const assert = require("node:assert/strict");
 const L = require("../library.js");
 const C = require("../core.js");
 const initial = () => L.seed([], [{ id: 1, sections: [] }]);
+test('imports reject duplicate or unreachable multi-select keys',()=>{
+  const wrap=q=>({sections:[{label:'Test',minutes:1,questions:[{id:'q',type:'multi',count:3,text:'Question',...q}]}]});
+  for(const q of [{key:'AA'},{key:'AB',limit:1},{key:'AB',limit:0},{key:'AB',limit:1.5},{key:'AB',limit:'2'}])
+    assert.throws(()=>L.validateTest(wrap(q)),/Multi-select/);
+  assert.doesNotThrow(()=>L.validateTest(wrap({key:'AB',limit:2})));
+});
 test("migration keeps stable IDs and never restores a deleted built-in test", () => {
   let records = initial();
   records = L.remove(records, ["test-1"], 10);

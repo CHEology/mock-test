@@ -1,5 +1,7 @@
 # Local question bank and attempts
 /data.js
+/writing-data.js
+/writing-assets/
 /assets/
 /.progress/
 /Mock-Test-attempts.json

@@ -57,6 +57,18 @@ class ServerTests(unittest.TestCase):
     def test_demo_fallback(self):
         self.assertIn(b'MOCK_TEST_DATA', self.request('/data.js'))
 
+    def test_writing_files_are_served_but_unlisted_assets_are_private(self):
+        for name in ['writing.html', 'writing.js', 'writing.css', 'writing-data.js', 'writing-assets/collection.pdf']:
+            target = server.ROOT / name
+            target.parent.mkdir(exist_ok=True)
+            target.write_bytes(b'writing fixture')
+            self.assertEqual(self.request('/' + name), b'writing fixture')
+        private = server.ROOT / 'writing-assets' / 'private.json'
+        private.write_text('private')
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.request('/writing-assets/private.json')
+        self.assertEqual(error.exception.code, 404)
+
     def test_local_files_are_not_served(self):
         for path in ['/server.py', '/.progress/progress.json', '/local-config.json']:
             with self.assertRaises(urllib.error.HTTPError) as error:
@@ -163,3 +175,23 @@ class ServerTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as error:
                 self.request(path)
             self.assertEqual(error.exception.code, 404)
+
+    def test_vocabulary_api_is_separate_and_validated(self):
+        self.request('/api/state', {'version':1,'attempts':[{'id':'exam','answers':{'q':'A'}}]})
+        before=server.STATE.read_bytes()
+        value={'version':1,'updated':100,'words':{'ambivalent':{'status':'learning','updated':100}},'prefs':{},'history':[]}
+        reply=json.loads(self.request('/api/vocabulary',value,**{'Content-Type':'application/json'}))
+        self.assertTrue(reply['saved'])
+        self.assertEqual(json.loads(self.request('/api/vocabulary'))['words']['ambivalent']['status'],'learning')
+        self.assertEqual(server.STATE.read_bytes(),before)
+        for headers,expected in [({'Origin':'https://example.com','Content-Type':'application/json'},403),({'Content-Type':'text/plain'},415)]:
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                self.request('/api/vocabulary',value,**headers)
+            self.assertEqual(error.exception.code,expected)
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.request('/api/vocabulary',{'version':2},**{'Content-Type':'application/json'})
+        self.assertEqual(error.exception.code,400)
+        for path in ['/vocabulary.py','/.progress/vocabulary.json']:
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                self.request(path)
+            self.assertEqual(error.exception.code,404)

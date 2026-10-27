@@ -19,6 +19,9 @@ class SyncTests(unittest.TestCase):
             for name in sync.SHARED:
                 (sync.ROOT / name).write_text('new shared file')
             (sync.ROOT / 'data.js').write_text('private questions')
+            (sync.ROOT / 'writing-data.js').write_text('official responses')
+            (sync.ROOT / 'writing-assets').mkdir()
+            (sync.ROOT / 'writing-assets' / 'collection.pdf').write_bytes(b'pdf')
             (sync.ROOT / 'icon.icns').write_bytes(b'example icon')
             (sync.ROOT / 'assets').mkdir()
             (sync.ROOT / 'assets' / '01.webp').write_bytes(b'question image')
@@ -34,6 +37,8 @@ class SyncTests(unittest.TestCase):
             for name in sync.SHARED:
                 self.assertEqual((destination / name).read_bytes(), (sync.ROOT / name).read_bytes())
             self.assertEqual((destination / 'data.js').read_text(), 'private questions')
+            self.assertEqual((destination / 'writing-data.js').read_text(), 'official responses')
+            self.assertEqual((destination / 'writing-assets' / 'collection.pdf').read_bytes(), b'pdf')
             self.assertEqual(saved.read_text(), '{"existing": "answers"}')
 
             if sys.platform == 'darwin':

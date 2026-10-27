@@ -10,6 +10,7 @@ import signal
 import os
 import tempfile
 import ai
+import vocabulary
 
 ROOT = Path(__file__).resolve().parent
 STATE = ROOT / '.progress' / 'progress.json'
@@ -117,6 +118,15 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({'error': 'Cannot read saved explanations'}, 500)
         if path == '/api/health':
             return self.send_json({'app': 'mock-test', 'version': 1})
+        if path == '/api/vocabulary':
+            if not self.valid_origin():
+                return self.send_error(403)
+            try:
+                with LOCK:
+                    state = vocabulary.read(ROOT)
+                return self.send_json(state)
+            except (OSError, ValueError):
+                return self.send_json({'error': 'Cannot read vocabulary progress'}, 500)
         if path == '/api/state':
             with LOCK:
                 try:
@@ -127,7 +137,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/data.js' and not (ROOT / 'data.js').exists():
             self.path = '/data.demo.js'
             return super().do_GET()
-        if path not in ['/', '/index.html', '/app.js', '/core.js', '/library.js', '/library-ui.js', '/ai.js', '/data.js', '/style.css', '/icon.svg'] and not (path.startswith('/assets/') and path.endswith('.webp') and '..' not in path):
+        if path not in ['/', '/index.html', '/app.js', '/core.js', '/library.js', '/library-ui.js', '/ai.js', '/data.js', '/style.css', '/icon.svg', '/vocabulary.html', '/writing.html', '/writing.js', '/writing.css', '/writing-data.js', '/writing-assets/collection.pdf'] and not (path.startswith('/assets/') and path.endswith('.webp') and '..' not in path):
             return self.send_error(404)
         return super().do_GET()
 
@@ -165,6 +175,23 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({'error': 'Cannot save explanations'}, 500)
 
     def do_PUT(self):
+        if self.path == '/api/vocabulary':
+            if not self.valid_host() or not self.valid_origin():
+                return self.send_error(403)
+            if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
+                return self.send_error(415)
+            try:
+                length = int(self.headers.get('Content-Length', '0'))
+                if not 0 < length <= 2_000_000:
+                    raise ValueError('Invalid request size')
+                incoming = json.loads(self.rfile.read(length))
+                with LOCK:
+                    state = vocabulary.write(ROOT, incoming)
+                return self.send_json({'saved': True, 'state': state})
+            except (ValueError, TypeError):
+                return self.send_json({'error': 'Invalid vocabulary progress'}, 400)
+            except OSError:
+                return self.send_json({'error': 'Cannot save vocabulary progress'}, 500)
         if self.path != '/api/state' or not self.valid_host():
             return self.send_error(403)
         if self.headers.get('Origin') not in [None, f'http://127.0.0.1:{PORT}', f'http://localhost:{PORT}']:

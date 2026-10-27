@@ -133,6 +133,11 @@
           fail("Choice counts must be between 1 and 26.");
         if (q.type === "blanks" && q.count > 3)
           fail("Up to three blanks are supported.");
+        if (q.type === "multi" &&
+            (new Set(q.key).size !== q.key.length ||
+             (q.limit !== undefined &&
+              (!Number.isInteger(q.limit) || q.limit < 1 || q.limit > q.count || q.key.length !== q.limit))))
+          fail("Multi-select keys must contain distinct choices and match the selection limit.");
         if (q.type === "sentence") {
           if (
             !Array.isArray(q.sentences) ||
