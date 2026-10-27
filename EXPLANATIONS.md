@@ -67,6 +67,14 @@ The **Explanations** switch in Settings is on by default. Turn it off to hide ex
 
 Hint requests omit the supplied key, correctness status, and supplied explanation, and use a separate conversation from full explanations. Models are instructed to give guidance without revealing the final answer.
 
+## Test vocabulary
+
+After finishing a test, choose **Vocabulary → Build with Codex** on the results page. The review reads all Verbal passages, questions, and choices, including correct answers and image-based questions. It selects a short list with meanings, exact source quotations, and contextual distinctions. Click a source link to open the original question.
+
+**Mark known** shares progress with the existing word bank. Later reviews exclude known words and consider words from previous reviews alongside current mistakes. Use **Known** to move a word back to learning. Open **Vocabulary → Test reviews** to revisit saved lists. **Refresh with Codex** replaces the list only after a successful response; a failed refresh keeps the earlier list.
+
+Vocabulary generation uses Codex and the selected model tier, with English output. It starts only when requested and uses the existing serial job queue, Stop, and Retry controls. Test vocabulary is saved with the attempt's tutor records; shared word familiarity is saved in `.progress/vocabulary.json`. Deleting an attempt removes its review but retains shared word familiarity.
+
 ## Storage and moving devices
 
 Answers and library organization are in `.progress/progress.json`. Tutor conversations are in `.progress/explanations.json`, separated by attempt, question or writing task, mode, and language. Deleting an attempt also deletes its conversations and stops its jobs. Ordinary attempt JSON exports contain answers only.
@@ -80,7 +88,7 @@ For a complete move, stop the app's server and copy the `.progress/` directory p
 | Channel says “not installed” | Confirm `codex --version` or `claude --version` works in the terminal that starts Mock Test. Restart the server after installing. On macOS, starting with `python3 launch.py` also avoids a GUI app's limited PATH. |
 | Claude Code sign-in expired | Run `claude auth login` again, even if `claude auth status` says logged in. If using only Desktop’s bundled CLI, invoke that executable with `auth login`; its path is under `~/Library/Application Support/Claude/claude-code/<version>/<build>/claude.app/Contents/MacOS/claude`. |
 | The local tool could not finish | Check login with the commands above, select Medium, and check account limits. Use current CLI versions; older releases may lack required flags. |
-| Thinking takes too long | The app stops a request after five minutes. Retry, or select Low or another channel. |
+| Thinking takes too long | The app stops a question request after five minutes and a whole-test vocabulary request after ten minutes. Retry, or select Low or another channel. |
 | Server stopped during a reply | Restart the server, reopen the question, and click Retry. Finished replies remain saved. |
 | The explanation says material is missing | Make sure the question includes its passage, diagram, and all options. Local image paths must be inside `assets/`; imported embedded images also work. |
 | No Explain / Hint button while answering | Enable a mode under During attempts. Writing uses Hint or Review writing. |

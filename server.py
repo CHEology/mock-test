@@ -110,6 +110,8 @@ class Handler(SimpleHTTPRequestHandler):
                 with LOCK:
                     if path == '/api/ai/providers':
                         return self.send_json({p: bool(ai.executable(p)) for p in ('codex', 'claude')})
+                    if path == '/api/ai/vocabulary':
+                        return self.send_json(tutor().vocabulary_reviews())
                     if path == '/api/ai/conversations':
                         attempt = parse_qs(urlsplit(self.path).query).get('attempt', [''])[0]
                         return self.send_json(tutor().list(attempt))
@@ -137,7 +139,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/data.js' and not (ROOT / 'data.js').exists():
             self.path = '/data.demo.js'
             return super().do_GET()
-        if path not in ['/', '/index.html', '/app.js', '/core.js', '/library.js', '/library-ui.js', '/ai.js', '/data.js', '/style.css', '/icon.svg', '/vocabulary.html', '/writing.html', '/writing.js', '/writing.css', '/writing-data.js', '/writing-assets/collection.pdf'] and not (path.startswith('/assets/') and path.endswith('.webp') and '..' not in path):
+        if path not in ['/', '/index.html', '/app.js', '/core.js', '/library.js', '/library-ui.js', '/ai.js', '/test-vocabulary.js', '/data.js', '/style.css', '/icon.svg', '/vocabulary.html', '/writing.html', '/writing.js', '/writing.css', '/writing-data.js', '/writing-assets/collection.pdf'] and not (path.startswith('/assets/') and path.endswith('.webp') and '..' not in path):
             return self.send_error(404)
         return super().do_GET()
 
@@ -167,6 +169,17 @@ class Handler(SimpleHTTPRequestHandler):
                 if self.path == '/api/ai/stop':
                     tutor().stop(attempt, value.get('id'))
                     return self.send_json({'stopped': True})
+                if value.get('mode') == 'vocabulary':
+                    saved = next(a for a in state['attempts'] if a['id'] == attempt)
+                    if saved.get('status') != 'done':
+                        return self.send_json({'error': 'Finish this test before reviewing vocabulary'}, 409)
+                    if not isinstance(value.get('context'), dict):
+                        raise ValueError('Missing Verbal materials')
+                    word_state = vocabulary.read(ROOT)['words']
+                    value['context']['known'] = [w for w, r in word_state.items() if r['status'] == 'mastered']
+                    learning = {w for w, r in word_state.items() if r['status'] == 'learning' or (r['wrong'] > 0 and r['status'] != 'mastered')}
+                    learning.update(w.get('lemma', w['word']) for review in tutor().vocabulary_reviews() for w in review.get('words', []))
+                    value['context']['learning'] = sorted(learning - set(value['context']['known']))[:5000]
                 identity = tutor().submit(value)
             return self.send_json({'id': identity}, 202)
         except (ValueError, TypeError, AttributeError) as exc:

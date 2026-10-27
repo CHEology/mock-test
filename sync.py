@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent
 CONFIG = ROOT / 'local-config.json'
 SHARED = ('README.md', 'EXPLANATIONS.md', 'index.html', 'style.css', 'app.js', 'core.js', 'icon.svg',
           'data.demo.js', 'ai.js', 'ai.py', 'library.js', 'library-ui.js', 'server.py', 'launch.py', 'vocabulary.py', 'vocabulary.html',
-          'writing.html', 'writing.js', 'writing.css')
+          'writing.html', 'writing.js', 'writing.css', 'vocab_review.py', 'test-vocabulary.js')
 
 def sync(destination):
     destination = Path(destination).expanduser().resolve()

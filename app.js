@@ -121,6 +121,7 @@ async function init() {
   } catch (_) {}
   if (location.hash === "#writing") renderWriting();
   else if (location.hash === "#vocabulary") renderVocabulary();
+  else if (location.hash === "#test-vocabulary") TestVocabulary.showSaved();
   else renderHome();
   if (oldLibrary !== JSON.stringify(db.library) ||
       (diskReady && JSON.stringify(C.mergeState(disk)) !== JSON.stringify(db)))
@@ -219,7 +220,7 @@ function renderWriting() {
   renderStudySection("writing", "Writing", "GRE writing essays and commentary");
 }
 function renderVocabulary() {
-  renderStudySection("vocabulary", "Vocabulary", "GRE 400 词汇学习");
+  renderStudySection("vocabulary", "Vocabulary", "GRE vocabulary");
 }
 function renderStudySection(section, title, frameTitle) {
   leaveFocusMode();
@@ -231,7 +232,8 @@ function renderStudySection(section, title, frameTitle) {
   screen = section;
   document.title = `${title} | Mock Test`;
   history.replaceState(null, "", `#${section}`);
-  app.innerHTML = libraryShell(`<iframe id="${section}-frame" title="${frameTitle}" src="${section}.html"></iframe>`, section);
+  app.innerHTML = libraryShell(`${section === "vocabulary" ? '<div class="vocab-entry"><button id="test-vocabulary-open">Test reviews ↗</button></div>' : ""}<iframe id="${section}-frame" title="${frameTitle}" src="${section}.html"></iframe>`, section);
+  $("#test-vocabulary-open")?.addEventListener("click", TestVocabulary.showSaved);
   const frame = $(`#${section}-frame`);
   frame.addEventListener("pointerenter", () => peekLibrarySidebar(false));
   frame.addEventListener("load", () => {
@@ -649,7 +651,7 @@ function renderResults() {
       return `<div class="score-card"><span>${esc(s.title || s.label)}</span><strong>${right} <span class="muted" style="font-size:21px">/ ${scored.length}</span></strong><span class="muted">${formatTime(active.times[t.sections.indexOf(s)] || 0)}</span></div>`;
     })
     .join("");
-  app.innerHTML = `<main class="results"><div class="row spread"><button data-action="results-history">← Attempts</button><div class="row"><button data-action="export-attempt">Export</button><button class="danger quiet" data-action="delete-current">Delete result</button></div></div><div style="margin-top:40px"><div class="eyebrow">${esc(testName(t))} · ${active.mode === "timed" ? "Timed" : "Untimed"}</div><h1 style="margin-top:16px">${total ? `${correct} of ${total} correct` : t.sections.length ? "No scored questions" : "Writing complete"}</h1>${excluded ? `<p class="muted">${excluded} disputed question${excluded > 1 ? "s" : ""} excluded from scoring.</p>` : ""}</div><div class="results-summary">${cards}</div><div class="row spread"><h2 style="margin:0">${t.sections.length ? "Review your answers" : "Your writing"}</h2>${active.includeEssay ? `<div class="row"><button data-action="review-essay">Read your essay</button>${settings.aiEnabled ? '<button data-ai="writing">Review writing</button>' : ""}</div>` : ""}${settings.aiEnabled && t.sections.length ? '<button data-ai="batch">Explain incorrect & unanswered</button>' : ""}</div>${settings.aiEnabled ? '<div id="ai-batch" class="row ai-batch"></div>' : ""}${AI.slot()}${t.sections
+  app.innerHTML = `<main class="results"><div class="row spread"><button data-action="results-history">← Attempts</button><div class="row"><button data-action="export-attempt">Export</button><button class="danger quiet" data-action="delete-current">Delete result</button></div></div><div style="margin-top:40px"><div class="eyebrow">${esc(testName(t))} · ${active.mode === "timed" ? "Timed" : "Untimed"}</div><h1 style="margin-top:16px">${total ? `${correct} of ${total} correct` : t.sections.length ? "No scored questions" : "Writing complete"}</h1>${excluded ? `<p class="muted">${excluded} disputed question${excluded > 1 ? "s" : ""} excluded from scoring.</p>` : ""}</div><div class="results-summary">${cards}</div>${TestVocabulary.slot(t)}<div class="row spread"><h2 style="margin:0">${t.sections.length ? "Review your answers" : "Your writing"}</h2>${active.includeEssay ? `<div class="row"><button data-action="review-essay">Read your essay</button>${settings.aiEnabled ? '<button data-ai="writing">Review writing</button>' : ""}</div>` : ""}${settings.aiEnabled && t.sections.length ? '<button data-ai="batch">Explain incorrect & unanswered</button>' : ""}</div>${settings.aiEnabled ? '<div id="ai-batch" class="row ai-batch"></div>' : ""}${AI.slot()}${t.sections
     .map(
       (s, si) =>
         `<h3 style="margin-top:32px">${esc(s.label)}</h3><table><thead><tr><th>Question</th><th>Your answer</th><th>Key</th><th>Result</th><th></th></tr></thead><tbody>${s.questions
@@ -661,6 +663,7 @@ function renderResults() {
     )
     .join("")}</main>`;
   AI.mount();
+  TestVocabulary.mount();
 }
 function resultQuestionHTML(q) {
   if (q.image)
@@ -984,7 +987,7 @@ function help() {
   } else renderInfoPage("Help", helpContent());
 }
 async function action(name) {
-  if (["vocabulary", "writing"].includes(screen) && name !== screen && location.hash === `#${screen}`) history.replaceState(null, "", location.pathname + location.search);
+  if (["vocabulary", "writing", "test-vocabulary"].includes(screen) && name !== screen && location.hash === `#${screen}`) history.replaceState(null, "", location.pathname + location.search);
   switch (name) {
     case "writing":
       renderWriting();
@@ -1209,7 +1212,8 @@ window.addEventListener("hashchange", () => {
   if (["test", "section-review", "between"].includes(screen)) return;
   if (location.hash === "#writing") renderWriting();
   else if (location.hash === "#vocabulary") renderVocabulary();
-  else if (!location.hash && ["writing", "vocabulary"].includes(screen)) renderHome();
+  else if (location.hash === "#test-vocabulary") TestVocabulary.showSaved();
+  else if (!location.hash && ["writing", "vocabulary", "test-vocabulary"].includes(screen)) renderHome();
 });
 window.addEventListener("storage", (e) => {
   if (e.key === "mock-test-settings" || e.key === null)

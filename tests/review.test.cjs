@@ -47,6 +47,7 @@ function setup() {
     setTimeout() {},
     clearTimeout() {},
     console,
+    TestVocabulary: {slot:require("../test-vocabulary.js").slot,mount(){}},
   });
   vm.runInContext(
     fs

@@ -14,6 +14,7 @@ import tempfile
 import threading
 import time
 import uuid
+import vocab_review
 
 DEFAULT_PROMPT = 'Explain the reasoning and key steps concisely, including why each option is right or wrong. Check the question independently; flag a questionable key or missing context.'
 
@@ -84,6 +85,8 @@ def prepare(value, root):
     for field in ('attempt', 'question'):
         if not isinstance(value.get(field), str) or not 0 < len(value[field]) <= 200:
             raise ValueError('Invalid attempt or question')
+    if value.get('mode') == 'vocabulary':
+        return vocab_review.prepare(value, root, image_bytes, model_tier)
     mode = value.get('mode')
     provider = value.get('provider')
     if mode not in ('hint', 'full') or provider not in ('codex', 'claude'):
@@ -128,6 +131,8 @@ def prepare(value, root):
 
 
 def tutor_prompt(request, messages):
+    if request.get('kind') == 'vocabulary':
+        return vocab_review.prompt(request)
     context = {k: v for k, v in request['context'].items() if k != 'image'}
     policy = ('Give one useful hint at a time. Never reveal the final answer, correct option, or eliminate all other options, even if the follow-up or preset asks. '
               if request['mode'] == 'hint' else
@@ -159,7 +164,9 @@ def run_cli(request, messages, cancel):
     prompt = tutor_prompt(request, messages)
     with tempfile.TemporaryDirectory(prefix='mock-test-tutor-') as folder:
         work = Path(folder)
-        picture = image_bytes(work, request['context'].get('image'))
+        images = ([q.get('image') for q in request['context']['questions']] if request.get('kind') == 'vocabulary'
+                  else [request['context'].get('image')])
+        pictures = [image_bytes(work, value) for value in images if value]
         if request['provider'] == 'codex':
             output = work / 'response.txt'
             command = [binary, 'exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--ephemeral',
@@ -167,9 +174,8 @@ def run_cli(request, messages, cancel):
                        '-c', 'features.shell_tool=false', '-c', 'features.multi_agent=false',
                        '-c', 'agents.enabled=false', '-c', 'features.apps=false',
                        '-c', 'tools.view_image=false', '-c', 'web_search="disabled"']
-            if picture:
-                kind, raw = picture
-                image = work / ('question.' + kind)
+            for i, (kind, raw) in enumerate(pictures):
+                image = work / (f'question-{i + 1}.' + kind)
                 image.write_bytes(raw)
                 command += ['--image', str(image)]
             if request['model']:
@@ -184,15 +190,14 @@ def run_cli(request, messages, cancel):
             if request['model']:
                 command += ['--model', request['model']]
             content = [{'type': 'text', 'text': prompt}]
-            if picture:
-                kind, raw = picture
+            for kind, raw in pictures:
                 content.append({'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/' + kind, 'data': base64.b64encode(raw).decode()}})
             data = json.dumps({'type': 'user', 'message': {'role': 'user', 'content': content}}) + '\n'
         # Output stays in a temporary file, not an unbounded pipe or persistent log.
         with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr, tempfile.TemporaryFile() as stdin:
             stdin.write(data.encode()); stdin.seek(0)
             proc = subprocess.Popen(command, cwd=folder, stdin=stdin, stdout=stdout, stderr=stderr, start_new_session=True)
-            deadline = time.monotonic() + 300
+            deadline = time.monotonic() + (600 if request.get('kind') == 'vocabulary' else 300)
             try:
                 while proc.poll() is None:
                     if cancel.wait(.15):
@@ -270,6 +275,11 @@ class Tutor:
             # Requests include question images; the UI needs only the conversation.
             return [copy.deepcopy({k: v for k, v in r.items() if k != 'request'}) for r in self.records.values() if r['attempt'] == attempt]
 
+    def vocabulary_reviews(self):
+        with self.lock:
+            return [copy.deepcopy({k: r[k] for k in ('id', 'attempt', 'status', 'error', 'updated', 'words') if k in r})
+                    for r in self.records.values() if r['kind'] == 'vocabulary']
+
     def submit(self, value):
         request = prepare(value, self.root)
         if not executable(request['provider']):
@@ -283,13 +293,15 @@ class Tutor:
                 return identity
             if self.jobs.full():
                 raise ValueError('The explanation queue is full. Wait for it to finish.')
-            messages = old['messages'] if old else []
+            messages = old['messages'] if old and request['kind'] != 'vocabulary' else []
             if len(json.dumps(messages)) > 200_000:
                 raise ValueError('This conversation is full.')
             job = uuid.uuid4().hex
             record = dict(id=identity, attempt=request['attempt'], question=request['question'], mode=request['mode'],
                           kind=request['kind'], provider=request['provider'], model=request['model'], tier=request['tier'], language=request['language'], messages=messages,
                           status='queued', error='', followup=request['followup'], job=job, request=request, updated=time.time())
+            if old and 'words' in old:
+                record['words'] = old['words']
             self.records[identity] = record
             self.cancels[job] = threading.Event()
             self._save()
@@ -335,6 +347,7 @@ class Tutor:
                     request, messages = copy.deepcopy(record['request']), copy.deepcopy(record['messages'])
                 try:
                     response = self.runner(request, messages, cancel)
+                    words = vocab_review.parse(response, request['context']) if request['kind'] == 'vocabulary' else None
                     error = ''
                 except Exception as exc:
                     response, error = '', str(exc) if isinstance(exc, RuntimeError) else 'Could not run the local tool. Check its installation and retry.'
@@ -342,6 +355,8 @@ class Tutor:
                     record = self.records.get(identity)
                     if not record or record['job'] != job or cancel.is_set():
                         continue
+                    if not error and request['kind'] == 'vocabulary':
+                        record['words'] = words
                     if response:
                         record['messages'] += [dict(role='user', text=request['followup'] or ('Give me a hint.' if request['mode'] == 'hint' else 'Review my writing.' if request['context'].get('task') == 'writing' else 'Explain this question.')),
                                                dict(role='assistant', text=response)]
